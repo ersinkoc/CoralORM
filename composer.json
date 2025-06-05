@@ -14,12 +14,13 @@
     },
     "autoload": {
         "psr-4": {
-            "App\\": "src/"
+            "YourOrm\\": "src/",
+            "YourOrm\\Migration\\Database\\": "migrations/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\YourOrm\\": "tests/"
         }
     }
 }

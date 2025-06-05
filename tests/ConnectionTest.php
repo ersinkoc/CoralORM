@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests;
+namespace Tests\YourOrm;
 
-use App\Connection;
+use YourOrm\Connection;
 use PHPUnit\Framework\TestCase;
 
 use PDO;
@@ -15,7 +15,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 class ConnectionTest extends TestCase
 {
     private MockObject|PDO $pdoMock;
-    private Connection $connection;
+    private Connection $connection; // This will be YourOrm\Connection
 
     protected function setUp(): void
     {

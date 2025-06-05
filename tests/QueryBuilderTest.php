@@ -2,17 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Tests;
+namespace Tests\YourOrm;
 
-use App\QueryBuilder;
-use App\Connection;
-use PHPUnit\Framework\TestCase;
-
-use App\Connection;
-use App\QueryBuilder;
+// Corrected use statements
+use YourOrm\Connection;
+use YourOrm\QueryBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use PDOStatement; // For mocking execute if we go that far
+use PDO;          // For PDO constants like PDO::FETCH_ASSOC
 
 class QueryBuilderTest extends TestCase
 {
@@ -21,8 +19,8 @@ class QueryBuilderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connectionMock = $this->createMock(Connection::class);
-        $this->qb = new QueryBuilder($this->connectionMock);
+        $this->connectionMock = $this->createMock(\YourOrm\Connection::class);
+        $this->qb = new \YourOrm\QueryBuilder($this->connectionMock);
     }
 
     public function testSelectQuery()
@@ -113,7 +111,7 @@ class QueryBuilderTest extends TestCase
                 "INSERT INTO users (name, email) VALUES (:insert_name, :insert_email)",
                 [':insert_name' => 'John Doe', ':insert_email' => 'john@example.com']
             )
-            ->willReturn($this->createMock(PDOStatement::class)); // Assuming execute returns a PDOStatement
+            ->willReturn($this->createMock(\PDOStatement::class)); // Assuming execute returns a PDOStatement
 
         $result = $this->qb->insert($table, $data);
         $this->assertTrue($result); // If execute doesn't throw, insert returns true
@@ -125,7 +123,7 @@ class QueryBuilderTest extends TestCase
         $data = ['status' => 'inactive'];
 
         // Mock the execute call for update
-         $stmtMock = $this->createMock(PDOStatement::class);
+         $stmtMock = $this->createMock(\PDOStatement::class);
         $this->connectionMock->expects($this->once())
             ->method('execute')
             ->with(
@@ -156,7 +154,7 @@ class QueryBuilderTest extends TestCase
         $table = 'users';
 
         // Mock the execute call for delete
-        $stmtMock = $this->createMock(PDOStatement::class);
+        $stmtMock = $this->createMock(\PDOStatement::class);
         $this->connectionMock->expects($this->once())
             ->method('execute')
             ->with(
@@ -212,7 +210,7 @@ class QueryBuilderTest extends TestCase
         // This test is more about the implicit limit(1) in fetch.
         // The actual getSql() for fetch is tested via mocking execute on connection.
 
-        $stmtMock = $this->createMock(PDOStatement::class);
+        $stmtMock = $this->createMock(\PDOStatement::class);
         $stmtMock->expects($this->once())->method('fetch')->with(PDO::FETCH_ASSOC)->willReturn(['id' => 1]);
         $this->connectionMock->expects($this->once())
             ->method('execute')
@@ -229,7 +227,7 @@ class QueryBuilderTest extends TestCase
         $expectedSql = "SELECT id, name FROM users WHERE status = :param0";
         $expectedParams = [':param0' => 'active'];
 
-        $stmtMock = $this->createMock(PDOStatement::class);
+        $stmtMock = $this->createMock(\PDOStatement::class);
         $stmtMock->expects($this->once())->method('fetchAll')->with(PDO::FETCH_ASSOC)->willReturn([['id' => 1, 'name' => 'A']]);
         $this->connectionMock->expects($this->once())
             ->method('execute')
@@ -250,10 +248,14 @@ class QueryBuilderTest extends TestCase
         // Simulate execution which would call reset (e.g. fetchAll)
         // We can call reset directly if we want to test it in isolation, but it's private.
         // Instead, execute a query that resets.
-        $stmtMock = $this->createMock(PDOStatement::class);
-        $stmtMock->method('fetchAll')->willReturn([]);
-        $this->connectionMock->method('execute')->willReturn($stmtMock);
-        $this->qb->fetchAll();
+        $baseStmtMock = $this->createMock(\PDOStatement::class); // Mock for most execute calls
+        $baseStmtMock->method('fetchAll')->willReturn([]); // For the fetchAll call specifically
+
+        $this->connectionMock->expects($this->any()) // Allow multiple calls to execute
+            ->method('execute')
+            ->willReturn($baseStmtMock); // Default mock for execute
+
+        $this->qb->fetchAll(); // This will use the $baseStmtMock
 
         // After reset (e.g. after fetchAll), state should be clear for a new query
         // A new SELECT query
@@ -262,7 +264,9 @@ class QueryBuilderTest extends TestCase
         $this->assertEquals([], $this->qb->getParameters(), "Parameters should be empty after reset and new query");
 
         // A new INSERT query (insert also resets)
-        $this->connectionMock->method('execute')->willReturn($this->createMock(PDOStatement::class)); // for insert
+        // Ensure the mock for 'execute' can handle this specific insert call if needed,
+        // or that the default $baseStmtMock is sufficient.
+        // If insert makes specific PDOStatement calls, a more specific mock might be needed here.
         $this->qb->insert('items', ['col' => 'val']); // This resets
 
         // Check state after insert reset

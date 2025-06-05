@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App;
+namespace YourOrm;
 
 use PDO;
 use PDOException;
@@ -82,5 +82,20 @@ class Connection
             // Log error and re-throw
             throw new PDOException("Query execution failed: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Gets the ID of the last inserted row or sequence value.
+     *
+     * @param string|null $name Name of the sequence object from which the ID should be returned.
+     * @return string|false The ID of the last inserted row, or false on failure.
+     * @throws PDOException If not connected to the database.
+     */
+    public function getLastInsertId(?string $name = null): string|false
+    {
+        if ($this->pdo === null) {
+            throw new PDOException("Not connected to the database.");
+        }
+        return $this->pdo->lastInsertId($name);
     }
 }
