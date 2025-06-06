@@ -187,24 +187,83 @@ namespace {$namespace};
 
 use YourOrm\Migration\AbstractMigration;
 use YourOrm\Migration\SchemaBuilder;
+use YourOrm\Connection; // For postUp type hinting
 
 class {$className} extends AbstractMigration
 {
     public function up(SchemaBuilder \$schema): void
     {
-        // TODO: Implement up() method. Example:
+        // --- Example: Create a new table ---
         // \$schema->createTable('{$migrationName_lowercase}', function(SchemaBuilder \$table) {
         //     \$table->id();
-        //     \$table->string('name')->nullable(false);
-        //     \$table->timestamps();
+        //     \$table->string('name', 191)->unique(); // VARCHAR(191) for UTF8MB4 compatibility
+        //     \$table->text('description')->nullable();
+        //     \$table->integer('count')->default(0);
+        //     \$table->decimal('price', 10, 2)->unsigned()->nullable(); // Example DECIMAL(10,2)
+        //     \$table->boolean('is_active')->default(true);
+        //     \$table->date('published_on')->nullable();
+        //     \$table->datetime('processed_at')->nullable();
+        //     \$table->timestamps(); // created_at and updated_at
         // });
+
+        // --- Example: Modify an existing table (add a column) ---
+        // \$schema->changeColumn('existing_table_name', 'column_to_add_if_not_exists_or_change', [
+        //     'name' => 'new_status_column',      // Use current name if not renaming
+        //     'type' => 'string',               // e.g. 'string', 'integer', 'text', 'boolean', 'date', 'datetime', 'float', 'decimal'
+        //     'length' => 50,                   // Optional, for 'string' type
+        //     // 'precision' => 10, 'scale' => 2, // Optional, for 'decimal' or 'float'
+        //     'nullable' => false,
+        //     'default' => 'pending',
+        //     // 'unsigned' => true,             // For numeric types
+        //     // 'unique' => true,
+        //     // 'after' => 'some_other_column' // MySQL specific for column order - not directly supported by SchemaBuilder generic options
+        // ]);
+
+        // --- Example: Add a foreign key constraint ---
+        // \$schema->addForeignKeyConstraint(
+        //     'source_table_name',          // Table that will have the foreign key
+        //     'source_column_name_fk',      // Column(s) in source_table_name
+        //     'target_table_name',          // Table the foreign key references
+        //     'target_column_name_pk',      // Column(s) in target_table_name (usually primary key)
+        //     'fk_custom_constraint_name',  // Optional: Name for the constraint
+        //     'CASCADE',                    // Optional: ON DELETE action (e.g., 'RESTRICT', 'CASCADE', 'SET NULL')
+        //     'CASCADE'                     // Optional: ON UPDATE action
+        // );
     }
 
     public function down(SchemaBuilder \$schema): void
     {
-        // TODO: Implement down() method. Example:
+        // --- Example: Drop a table ---
         // \$schema->dropTableIfExists('{$migrationName_lowercase}');
+
+        // --- Example: Drop a column (SchemaBuilder needs a dropColumn method) ---
+        // \$schema->dropColumn('existing_table_name', 'new_status_column');
+        // Note: dropColumn is not yet implemented in the provided SchemaBuilder.
+        // You would typically use:
+        // \$schema->executeStatements("ALTER TABLE `existing_table_name` DROP COLUMN `new_status_column`;");
+
+
+        // --- Example: Drop a foreign key constraint ---
+        // Make sure to use the correct constraint name, especially if it was auto-generated.
+        // \$schema->dropForeignKeyConstraint('source_table_name', 'fk_custom_constraint_name_or_auto_generated_one');
     }
+
+    /**
+     * Optional: Actions to perform after 'up' migration (e.g., data seeding).
+     * public function postUp(Connection \$connection): void
+     * {
+     *     // Example: Seed initial data using QueryBuilder
+     *     // \$qb = new \YourOrm\QueryBuilder(\$connection);
+     *     // \$qb->insert('{$migrationName_lowercase}', [
+     *     //    ['name' => 'Default Item 1', 'description' => 'First item created via postUp'],
+     *     //    ['name' => 'Default Item 2', 'description' => 'Second item via postUp']
+     *     // ])->execute(); // Assuming insert can take array of arrays for batch insert or loop it
+     *
+     *     // Or direct PDO execution:
+     *     // \$stmt = \$connection->getPdo()->prepare("INSERT INTO `{$migrationName_lowercase}` (name) VALUES (?)");
+     *     // \$stmt->execute(['My Seeded Item']);
+     * }
+     */
 }
 
 PHP;

@@ -12,6 +12,8 @@ use YourOrm\Mapping\Column;
 use YourOrm\Mapping\PrimaryKey;
 use YourOrm\Mapping\CreatedAt;
 use YourOrm\Mapping\UpdatedAt;
+use YourOrm\Mapping\NotNull;
+use YourOrm\Mapping\Length;
 use DateTimeImmutable;
 use Tests\YourOrm\TestEntities\UserWithHasMany;
 use Tests\YourOrm\TestEntities\PostWithBelongsTo;
@@ -26,7 +28,16 @@ class TestAttributeEntity extends Entity // YourOrm\Entity
     public ?int $id = null;
 
     #[Column(name: 'entity_name', type: 'string')]
+    #[NotNull]
     public ?string $name = null;
+
+    #[Column(name: 'description', type: 'string')]
+    #[Length(max: 255)]
+    public ?string $description = null;
+
+    #[Column(name: 'code', type: 'string')]
+    #[Length(min: 5, max: 10)]
+    public ?string $code = null;
 
     #[Column(type: 'int')] // DB name will be 'age_value' by default snake_case
     public ?int $ageValue = null;
@@ -79,6 +90,23 @@ class EntityTest extends TestCase
         $this->assertArrayHasKey('name', $metadata->columns);
         $this->assertEquals('entity_name', $metadata->columns['name']['name']);
         $this->assertEquals('string', $metadata->columns['name']['phpType']);
+        $this->assertArrayHasKey('name', $metadata->propertyValidations, "Validation metadata should exist for 'name'.");
+        $this->assertInstanceOf(NotNull::class, $metadata->propertyValidations['name'][0]);
+
+        $this->assertArrayHasKey('description', $metadata->columns);
+        $this->assertEquals('description', $metadata->columns['description']['name']);
+        $this->assertArrayHasKey('description', $metadata->propertyValidations, "Validation metadata should exist for 'description'.");
+        $this->assertInstanceOf(Length::class, $metadata->propertyValidations['description'][0]);
+        $this->assertEquals(255, $metadata->propertyValidations['description'][0]->max);
+        $this->assertNull($metadata->propertyValidations['description'][0]->min);
+
+        $this->assertArrayHasKey('code', $metadata->columns);
+        $this->assertEquals('code', $metadata->columns['code']['name']);
+        $this->assertArrayHasKey('code', $metadata->propertyValidations, "Validation metadata should exist for 'code'.");
+        $this->assertInstanceOf(Length::class, $metadata->propertyValidations['code'][0]);
+        $this->assertEquals(5, $metadata->propertyValidations['code'][0]->min);
+        $this->assertEquals(10, $metadata->propertyValidations['code'][0]->max);
+
 
         $this->assertArrayHasKey('ageValue', $metadata->columns);
         $this->assertEquals('age_value', $metadata->columns['ageValue']['name']); // Default snake case

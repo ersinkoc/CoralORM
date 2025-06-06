@@ -17,7 +17,8 @@ use YourOrm\Mapping\Column;
 use YourOrm\Mapping\PrimaryKey;
 use YourOrm\Mapping\CreatedAt;
 use YourOrm\Mapping\UpdatedAt;
-use YourOrm\Mapping\BelongsTo; // For relationship tests
+use YourOrm\Mapping\BelongsTo;
+use YourOrm\Mapping\ManyToMany; // For ManyToMany relationship tests
 use DateTimeImmutable;
 
 
@@ -62,6 +63,52 @@ class RelatedEntityForRepoTest extends Entity
     #[Column(name: 'related_name', type: 'string')]
     public ?string $relatedName = null;
 }
+
+// --- Entities for ManyToMany Test ---
+#[Table(name: 'posts_repo_test')]
+class PostRepoTest extends Entity
+{
+    #[PrimaryKey]
+    #[Column(type: 'int')]
+    public ?int $id = null;
+
+    #[Column(type: 'string')]
+    public ?string $title = null;
+
+    /**
+     * @var array<TagRepoTest>|null
+     */
+    #[ManyToMany(
+        targetEntity: TagRepoTest::class,
+        joinTableName: 'post_tag_repo_join',
+        localKeyColumnName: 'post_id',      // FK in join table for PostRepoTest
+        foreignKeyColumnName: 'tag_id'     // FK in join table for TagRepoTest
+    )]
+    public ?array $tags = null;
+}
+
+#[Table(name: 'tags_repo_test')]
+class TagRepoTest extends Entity
+{
+    #[PrimaryKey]
+    #[Column(type: 'int')]
+    public ?int $id = null;
+
+    #[Column(type: 'string')]
+    public ?string $name = null;
+
+    /**
+     * @var array<PostRepoTest>|null
+     */
+    #[ManyToMany(
+        targetEntity: PostRepoTest::class,
+        joinTableName: 'post_tag_repo_join',
+        localKeyColumnName: 'tag_id',        // FK in join table for TagRepoTest
+        foreignKeyColumnName: 'post_id'     // FK in join table for PostRepoTest
+    )]
+    public ?array $posts = null; // Inverse relation (optional for testing one side)
+}
+// --- End Entities for ManyToMany Test ---
 
 
 class RepositoryTest extends TestCase
@@ -177,6 +224,115 @@ class RepositoryTest extends TestCase
         $this->assertEquals(3, $entities[0]->id);
         $this->assertEquals('Specific User', $entities[0]->name);
     }
+
+    public function testFindByWithPropertyNamesAndOperators()
+    {
+        // Criteria use Entity property names
+        $criteria = ['name' => 'Specific User', 'emailAddress' => 'specific@example.com'];
+        // OrderBy uses Entity property names
+        $orderBy = ['createdAt' => 'DESC']; // 'createdAt' is a property
+        $limit = 5;
+        $offset = 0;
+        $rowData = [['repo_entity_id' => 3, 'entity_name' => 'Specific User', 'email_address' => 'specific@example.com']];
+
+        $pdoStmtMock = $this->createMock(PDOStatement::class);
+        $this->connectionMock->expects($this->once())
+            ->method('execute')
+            ->with(
+                // SQL uses DB column names ('entity_name', 'email_address', 'created_at')
+                // Mapped from property names by Repository::findBy
+                "SELECT * FROM test_repo_entities WHERE entity_name = :param0 AND email_address = :param1 ORDER BY created_at DESC LIMIT 5 OFFSET 0",
+                [':param0' => 'Specific User', ':param1' => 'specific@example.com']
+            )
+            ->willReturn($pdoStmtMock);
+        $pdoStmtMock->expects($this->once())->method('fetchAll')->with(\PDO::FETCH_ASSOC)->willReturn($rowData);
+
+        // Repository::findBy takes property names in criteria and orderBy
+        $entities = $this->repository->findBy($criteria, $orderBy, $limit, $offset);
+        $this->assertCount(1, $entities);
+        $this->assertEquals(3, $entities[0]->id);
+        $this->assertEquals('Specific User', $entities[0]->name);
+    }
+
+    public function testFindByWithInClauseUsingPropertyNames()
+    {
+        // 'id' is a property name in TestAttributeRepositoryEntity
+        $criteria = ['id' => [1, 2, 3]];
+        $rowData = [
+            ['repo_entity_id' => 1, 'entity_name' => 'User 1'],
+            ['repo_entity_id' => 2, 'entity_name' => 'User 2'],
+        ];
+
+        $pdoStmtMock = $this->createMock(PDOStatement::class);
+        $this->connectionMock->expects($this->once())
+            ->method('execute')
+            ->with(
+                // 'repo_entity_id' is the DB column name for 'id' property
+                "SELECT * FROM test_repo_entities WHERE repo_entity_id IN (:param0, :param1, :param2)",
+                // The QueryBuilder whereIn will create :param0, :param1, ...
+                // Actual parameter names might vary based on QueryBuilder's param generation.
+                // For this test, we care that an IN clause is formed for the correct column.
+                // The exact parameter names (:param0_in0, :param0_in1 or similar) depend on QueryBuilder.
+                // Let's assume it generates :param0, :param1, :param2 for the values in the IN clause.
+                // This part of the test is somewhat coupled to QueryBuilder's whereIn behavior.
+                $this->callback(function($params) {
+                    return $params[':param0'] === 1 && $params[':param1'] === 2 && $params[':param2'] === 3;
+                })
+            )
+            ->willReturn($pdoStmtMock);
+        $pdoStmtMock->expects($this->once())->method('fetchAll')->with(\PDO::FETCH_ASSOC)->willReturn($rowData);
+
+        $entities = $this->repository->findBy($criteria);
+        $this->assertCount(2, $entities);
+    }
+
+    public function testFindByThrowsExceptionForInvalidProperty()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Property 'nonExistentProperty' is not a mapped property of entity " . TestAttributeRepositoryEntity::class);
+        $this->repository->findBy(['nonExistentProperty' => 'value']);
+    }
+
+    public function testFindOneBySuccessfully()
+    {
+        // Criteria use Entity property names
+        $criteria = ['emailAddress' => 'unique@example.com'];
+        $orderBy = ['name' => 'ASC']; // Property name 'name'
+        $rowData = ['repo_entity_id' => 10, 'entity_name' => 'Unique User', 'email_address' => 'unique@example.com'];
+
+        $pdoStmtMock = $this->createMock(PDOStatement::class);
+        $this->connectionMock->expects($this->once())
+            ->method('execute')
+            ->with(
+                // SQL uses DB column names ('email_address', 'entity_name')
+                "SELECT * FROM test_repo_entities WHERE email_address = :param0 ORDER BY entity_name ASC LIMIT 1 OFFSET 0",
+                [':param0' => 'unique@example.com']
+            )
+            ->willReturn($pdoStmtMock);
+        $pdoStmtMock->expects($this->once())->method('fetch')->with(\PDO::FETCH_ASSOC)->willReturn($rowData);
+
+        // findOneBy uses property names
+        $entity = $this->repository->findOneBy($criteria, $orderBy);
+        $this->assertInstanceOf(TestAttributeRepositoryEntity::class, $entity);
+        $this->assertEquals(10, $entity->id);
+        $this->assertEquals('Unique User', $entity->name);
+    }
+
+    public function testFindOneByReturnsNullWhenNoMatch()
+    {
+        $criteria = ['name' => 'NoSuchUser']; // Property name 'name'
+        $pdoStmtMock = $this->createMock(PDOStatement::class);
+        $this->connectionMock->expects($this->once())
+            ->method('execute')
+             // SQL uses DB column name 'entity_name'
+            ->with("SELECT * FROM test_repo_entities WHERE entity_name = :param0 LIMIT 1 OFFSET 0", [':param0' => 'NoSuchUser'])
+            ->willReturn($pdoStmtMock);
+        $pdoStmtMock->expects($this->once())->method('fetch')->with(\PDO::FETCH_ASSOC)->willReturn(false);
+
+        $entity = $this->repository->findOneBy($criteria);
+        $this->assertNull($entity);
+    }
+
 
     public function testSaveInsertNewEntity()
     {
@@ -377,5 +533,105 @@ class RepositoryTest extends TestCase
         $eagerLoadProp = $reflection->getProperty('eagerLoad');
         $eagerLoadProp->setAccessible(true);
         $this->assertEmpty($eagerLoadProp->getValue($this->repository));
+    }
+
+    public function testWithManyToManyEagerLoading()
+    {
+        // Use PostRepoTest as the primary entity
+        $postRepository = new Repository($this->connectionMock, PostRepoTest::class);
+        $postRepository->with('tags'); // Eager load the 'tags' relation
+
+        // 1. Mock fetching primary entities (Posts)
+        $postsData = [
+            ['id' => 1, 'title' => 'Post 1'],
+            ['id' => 2, 'title' => 'Post 2'],
+            ['id' => 3, 'title' => 'Post 3 With No Tags'],
+        ];
+        $stmtPosts = $this->createMock(PDOStatement::class);
+        $stmtPosts->method('fetchAll')->with(\PDO::FETCH_ASSOC)->willReturn($postsData);
+
+        // 2. Mock fetching from the join table (post_tag_repo_join)
+        // This query will be based on the IDs of posts fetched (1, 2, 3)
+        $joinTableData = [
+            ['post_id' => 1, 'tag_id' => 101], // Post 1 has Tag 101
+            ['post_id' => 1, 'tag_id' => 102], // Post 1 has Tag 102
+            ['post_id' => 2, 'tag_id' => 101], // Post 2 has Tag 101
+        ];
+        $stmtJoinTable = $this->createMock(PDOStatement::class);
+        $stmtJoinTable->method('fetchAll')->with(\PDO::FETCH_ASSOC)->willReturn($joinTableData);
+
+        // 3. Mock fetching related entities (Tags)
+        // This query will be based on the tag_ids collected from join table (101, 102)
+        $tagsData = [
+            ['id' => 101, 'name' => 'Tag Alpha'],
+            ['id' => 102, 'name' => 'Tag Beta'],
+        ];
+        $stmtTags = $this->createMock(PDOStatement::class);
+        $stmtTags->method('fetchAll')->with(\PDO::FETCH_ASSOC)->willReturn($tagsData);
+
+        // Set up Connection mock for 3 expected calls
+        $callCount = 0;
+        $this->connectionMock->expects($this->exactly(3))
+            ->method('execute')
+            ->willReturnCallback(
+                function(string $sql, array $params = []) use ($stmtPosts, $stmtJoinTable, $stmtTags, &$callCount) {
+                    $callCount++;
+                    if ($callCount === 1 && str_contains($sql, "SELECT * FROM posts_repo_test")) { // Fetching Posts
+                        return $stmtPosts;
+                    } elseif ($callCount === 2 && str_contains($sql, "SELECT post_id, tag_id FROM post_tag_repo_join WHERE post_id IN")) { // Fetching from Join Table
+                        // Check if params for IN clause are correct (1, 2, 3)
+                        $this->assertContains(1, $params);
+                        $this->assertContains(2, $params);
+                        $this->assertContains(3, $params);
+                        return $stmtJoinTable;
+                    } elseif ($callCount === 3 && str_contains($sql, "SELECT * FROM tags_repo_test WHERE id IN")) { // Fetching Tags
+                        // Check if params for IN clause are correct (101, 102)
+                        $this->assertContains(101, $params);
+                        $this->assertContains(102, $params);
+                        return $stmtTags;
+                    }
+                    throw new \LogicException("Unexpected SQL query (#{$callCount}) in testWithManyToManyEagerLoading: " . $sql . " with params: " . json_encode($params));
+                }
+            );
+
+        // Action: Fetch posts, which should trigger eager loading of tags
+        $posts = $postRepository->findAll();
+        $this->assertCount(3, $posts);
+
+        // Assertions for Post 1 (id:1, should have Tag 101 'Alpha' and Tag 102 'Beta')
+        $post1 = $posts[0];
+        $this->assertEquals(1, $post1->id);
+        $this->assertIsArray($post1->tags);
+        $this->assertCount(2, $post1->tags);
+        $this->assertInstanceOf(TagRepoTest::class, $post1->tags[0]);
+        $this->assertEquals(101, $post1->tags[0]->id);
+        $this->assertEquals('Tag Alpha', $post1->tags[0]->name);
+        $this->assertInstanceOf(TagRepoTest::class, $post1->tags[1]);
+        $this->assertEquals(102, $post1->tags[1]->id);
+        $this->assertEquals('Tag Beta', $post1->tags[1]->name);
+
+        // Assertions for Post 2 (id:2, should have Tag 101 'Alpha')
+        $post2 = $posts[1];
+        $this->assertEquals(2, $post2->id);
+        $this->assertIsArray($post2->tags);
+        $this->assertCount(1, $post2->tags);
+        $this->assertInstanceOf(TagRepoTest::class, $post2->tags[0]);
+        $this->assertEquals(101, $post2->tags[0]->id);
+        $this->assertEquals('Tag Alpha', $post2->tags[0]->name);
+        // Check if it's the same Tag instance as for Post 1
+        $this->assertSame($post1->tags[0], $post2->tags[0], "Shared tags should be the same PHP instance.");
+
+
+        // Assertions for Post 3 (id:3, should have no tags)
+        $post3 = $posts[2];
+        $this->assertEquals(3, $post3->id);
+        $this->assertIsArray($post3->tags);
+        $this->assertEmpty($post3->tags);
+
+        // Check that eagerLoad property is cleared
+        $reflection = new \ReflectionClass(Repository::class);
+        $eagerLoadProp = $reflection->getProperty('eagerLoad');
+        $eagerLoadProp->setAccessible(true);
+        $this->assertEmpty($eagerLoadProp->getValue($postRepository));
     }
 }

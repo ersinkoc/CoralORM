@@ -94,6 +94,98 @@ class QueryBuilderTest extends TestCase
         $this->assertEquals([':param0' => true], $this->qb->getParameters());
     }
 
+    public function testOrderByWithArray()
+    {
+        $this->qb->select()
+            ->from('products')
+            ->orderBy(['category' => 'ASC', 'price' => 'DESC']);
+
+        $expectedSql = "SELECT * FROM products ORDER BY category ASC, price DESC";
+        $this->assertEquals($expectedSql, $this->qb->getSql());
+    }
+
+    public function testGroupByClause()
+    {
+        $this->qb->select('category', 'COUNT(*) as item_count')
+            ->from('products')
+            ->groupBy('category');
+
+        $expectedSql = "SELECT category, COUNT(*) as item_count FROM products GROUP BY category";
+        $this->assertEquals($expectedSql, $this->qb->getSql());
+
+        // Test with multiple group by columns
+        $this->qb->select('category', 'type', 'COUNT(*) as item_count')
+            ->from('products')
+            ->groupBy(['category', 'type']); // Pass as array
+
+        $expectedSqlMulti = "SELECT category, type, COUNT(*) as item_count FROM products GROUP BY category, type";
+        $this->assertEquals($expectedSqlMulti, $this->qb->getSql());
+    }
+
+    public function testHavingClause()
+    {
+        // Note: Current Having implementation takes a raw string and does not manage parameters for it.
+        $this->qb->select('category', 'AVG(price) as avg_price')
+            ->from('products')
+            ->groupBy('category')
+            ->having('AVG(price) > 100.00');
+
+        $expectedSql = "SELECT category, AVG(price) as avg_price FROM products GROUP BY category HAVING AVG(price) > 100.00";
+        $this->assertEquals($expectedSql, $this->qb->getSql());
+    }
+
+    public function testJoinClauses()
+    {
+        $this->qb->select('users.name', 'orders.id as order_id')
+            ->from('users')
+            ->join('orders', 'users.id = orders.user_id'); // Default INNER JOIN
+
+        $expectedSqlInner = "SELECT users.name, orders.id as order_id FROM users INNER JOIN orders ON users.id = orders.user_id";
+        $this->assertEquals($expectedSqlInner, $this->qb->getSql());
+
+        // Reset for next test (QueryBuilder state is reset by getSql normally, but this is for internal state before getSql)
+        $this->setUp(); // Re-initialize QB for a clean state
+        $this->qb->select('u.name', 'p.product_name')
+            ->from('users', 'u')
+            ->leftJoin('profiles', 'u.id = profiles.user_id') // Using leftJoin helper
+            ->rightJoin('departments', 'u.department_id = departments.id'); // Using rightJoin helper
+
+        $expectedSqlTyped = "SELECT u.name, p.product_name FROM users AS u LEFT JOIN profiles ON u.id = profiles.user_id RIGHT JOIN departments ON u.department_id = departments.id";
+        $this->assertEquals($expectedSqlTyped, $this->qb->getSql());
+    }
+
+    public function testAggregateFunctions()
+    {
+        $this->qb->from('orders')->count();
+        $this->assertEquals("SELECT COUNT(*) AS count_all FROM orders", $this->qb->getSql());
+
+        $this->setUp();
+        $this->qb->from('orders')->count('id');
+        $this->assertEquals("SELECT COUNT(id) AS count_id FROM orders", $this->qb->getSql());
+
+        $this->setUp();
+        $this->qb->from('order_items')->sum('quantity');
+        $this->assertEquals("SELECT SUM(quantity) AS sum_quantity FROM order_items", $this->qb->getSql());
+
+        $this->setUp();
+        $this->qb->from('products')->avg('price');
+        $this->assertEquals("SELECT AVG(price) AS avg_price FROM products", $this->qb->getSql());
+
+        $this->setUp();
+        $this->qb->from('products')->min('price');
+        $this->assertEquals("SELECT MIN(price) AS min_price FROM products", $this->qb->getSql());
+
+        $this->setUp();
+        $this->qb->from('products')->max('price');
+        $this->assertEquals("SELECT MAX(price) AS max_price FROM products", $this->qb->getSql());
+
+        $this->setUp(); // Test chaining and other clauses with aggregate
+        $this->qb->from('products')->max('price')->where('category_id', '=', 5);
+        $this->assertEquals("SELECT MAX(price) AS max_price FROM products WHERE category_id = :param0", $this->qb->getSql());
+        $this->assertEquals([':param0' => 5], $this->qb->getParameters());
+    }
+
+
     public function testInsertReturnsSelf()
     {
         $result = $this->qb->insert('users', ['name' => 'Test']);

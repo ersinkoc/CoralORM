@@ -19,6 +19,9 @@ class QueryBuilder
     private ?string $fromAlias = null;
     private array $whereClauses = [];
     private array $orderByClauses = [];
+    private array $groupByColumns = [];
+    private ?string $havingCondition = null; // For simplicity, one raw string condition first
+    private array $joinClauses = [];
     private ?int $limitValue = null;
     private ?int $offsetValue = null;
     private array $parameters = [];
@@ -104,16 +107,41 @@ class QueryBuilder
      * Adds an ORDER BY clause to the query.
      *
      * @param string $column The column to order by.
-     * @param string $direction The sort direction ('ASC' or 'DESC').
+     * @param string|array $columns The column to order by, or an array of [column => direction].
+     * @param string $direction The sort direction ('ASC' or 'DESC'), used if $columns is a string.
      * @return self
+     * @throws \InvalidArgumentException If direction is invalid or input is malformed.
      */
-    public function orderBy(string $column, string $direction = 'ASC'): self
+    public function orderBy(string|array $columns, string $direction = 'ASC'): self
     {
-        $direction = strtoupper($direction);
-        if (!in_array($direction, ['ASC', 'DESC'])) {
-            throw new \InvalidArgumentException("Invalid ORDER BY direction: {$direction}. Must be 'ASC' or 'DESC'.");
+        if (is_string($columns)) {
+            $direction = strtoupper($direction);
+            if (!in_array($direction, ['ASC', 'DESC'])) {
+                throw new \InvalidArgumentException("Invalid ORDER BY direction: {$direction}. Must be 'ASC' or 'DESC'.");
+            }
+            $this->orderByClauses[] = "{$columns} {$direction}";
+        } elseif (is_array($columns)) {
+            foreach ($columns as $column => $dir) {
+                if (is_int($column)) { // Allows orderBy(['column1', 'column2 DESC']) but not recommended
+                    // Attempt to parse column and direction if direction is part of the string
+                    $parts = preg_split('/\s+/', trim($dir));
+                    $colName = $parts[0];
+                    $colDir = strtoupper($parts[1] ?? 'ASC');
+                     if (!in_array($colDir, ['ASC', 'DESC'])) {
+                        throw new \InvalidArgumentException("Invalid ORDER BY direction '{$colDir}' for column '{$colName}'. Must be 'ASC' or 'DESC'.");
+                    }
+                    $this->orderByClauses[] = "{$colName} {$colDir}";
+                } else {
+                    $dir = strtoupper($dir);
+                    if (!in_array($dir, ['ASC', 'DESC'])) {
+                        throw new \InvalidArgumentException("Invalid ORDER BY direction '{$dir}' for column '{$column}'. Must be 'ASC' or 'DESC'.");
+                    }
+                    $this->orderByClauses[] = "{$column} {$dir}";
+                }
+            }
+        } else {
+            throw new \InvalidArgumentException("orderBy expects a string column name or an array of [column => direction].");
         }
-        $this->orderByClauses[] = "{$column} {$direction}";
         return $this;
     }
 
@@ -147,6 +175,170 @@ class QueryBuilder
         return $this;
     }
 
+    // --- Aggregate Functions ---
+
+    /**
+     * Sets the SELECT clause to a COUNT aggregate.
+     * @param string $column The column to count. Defaults to '*'.
+     * @return self
+     */
+    public function count(string $column = '*'): self
+    {
+        $this->queryType = 'SELECT';
+        $alias = "count_{$column}";
+        if ($column === '*') {
+            $alias = 'count_all';
+        } else {
+             $alias = "count_" . str_replace(['.', '(', ')'], ['_', '', ''], $column);
+        }
+        $this->selectColumns = ["COUNT({$column}) AS {$alias}"];
+        return $this;
+    }
+
+    /**
+     * Sets the SELECT clause to a SUM aggregate.
+     * @param string $column The column to sum.
+     * @return self
+     */
+    public function sum(string $column): self
+    {
+        if (empty($column) || $column === '*') {
+            throw new \InvalidArgumentException("Column must be specified for SUM aggregate.");
+        }
+        $this->queryType = 'SELECT';
+        $alias = "sum_" . str_replace(['.', '(', ')'], ['_', '', ''], $column);
+        $this->selectColumns = ["SUM({$column}) AS {$alias}"];
+        return $this;
+    }
+
+    /**
+     * Sets the SELECT clause to an AVG aggregate.
+     * @param string $column The column to average.
+     * @return self
+     */
+    public function avg(string $column): self
+    {
+        if (empty($column) || $column === '*') {
+            throw new \InvalidArgumentException("Column must be specified for AVG aggregate.");
+        }
+        $this->queryType = 'SELECT';
+        $alias = "avg_" . str_replace(['.', '(', ')'], ['_', '', ''], $column);
+        $this->selectColumns = ["AVG({$column}) AS {$alias}"];
+        return $this;
+    }
+
+    /**
+     * Sets the SELECT clause to a MIN aggregate.
+     * @param string $column The column to find the minimum of.
+     * @return self
+     */
+    public function min(string $column): self
+    {
+        if (empty($column) || $column === '*') {
+            throw new \InvalidArgumentException("Column must be specified for MIN aggregate.");
+        }
+        $this->queryType = 'SELECT';
+        $alias = "min_" . str_replace(['.', '(', ')'], ['_', '', ''], $column);
+        $this->selectColumns = ["MIN({$column}) AS {$alias}"];
+        return $this;
+    }
+
+    /**
+     * Sets the SELECT clause to a MAX aggregate.
+     * @param string $column The column to find the maximum of.
+     * @return self
+     */
+    public function max(string $column): self
+    {
+        if (empty($column) || $column === '*') {
+            throw new \InvalidArgumentException("Column must be specified for MAX aggregate.");
+        }
+        $this->queryType = 'SELECT';
+        $alias = "max_" . str_replace(['.', '(', ')'], ['_', '', ''], $column);
+        $this->selectColumns = ["MAX({$column}) AS {$alias}"];
+        return $this;
+    }
+
+    /**
+     * Adds a JOIN clause to the query.
+     *
+     * @param string $table The table to join with.
+     * @param string $condition The ON condition for the join (e.g., 'users.id = posts.user_id').
+     * @param string $type The type of join (INNER, LEFT, RIGHT, etc.).
+     * @return self
+     */
+    public function join(string $table, string $condition, string $type = 'INNER'): self
+    {
+        $type = strtoupper($type);
+        $allowedTypes = ['INNER', 'LEFT', 'RIGHT', 'FULL OUTER', 'CROSS']; // Add more if needed
+        if (!in_array($type, $allowedTypes)) {
+            throw new \InvalidArgumentException("Unsupported JOIN type: {$type}");
+        }
+        $this->joinClauses[] = [
+            'table' => $table,
+            'condition' => $condition,
+            'type' => $type,
+        ];
+        return $this;
+    }
+
+    /**
+     * Adds a LEFT JOIN clause to the query.
+     *
+     * @param string $table The table to join with.
+     * @param string $condition The ON condition for the join.
+     * @return self
+     */
+    public function leftJoin(string $table, string $condition): self
+    {
+        return $this->join($table, $condition, 'LEFT');
+    }
+
+    /**
+     * Adds a RIGHT JOIN clause to the query.
+     *
+     * @param string $table The table to join with.
+     * @param string $condition The ON condition for the join.
+     * @return self
+     */
+    public function rightJoin(string $table, string $condition): self
+    {
+        return $this->join($table, $condition, 'RIGHT');
+    }
+
+    /**
+     * Adds a GROUP BY clause to the query.
+     *
+     * @param string|array $columns Column name or array of column names to group by.
+     * @return self
+     */
+    public function groupBy(string|array $columns): self
+    {
+        if (is_array($columns)) {
+            $this->groupByColumns = array_merge($this->groupByColumns, $columns);
+        } else {
+            $this->groupByColumns[] = $columns;
+        }
+        $this->groupByColumns = array_unique($this->groupByColumns); // Avoid duplicates
+        return $this;
+    }
+
+    /**
+     * Adds a HAVING clause to the query.
+     * Note: Parameters in the having condition must be managed manually or use literal values.
+     * For simplicity, this version accepts a raw string.
+     *
+     * @param string $conditions The HAVING condition string.
+     * @return self
+     */
+    public function having(string $conditions): self
+    {
+        // For more advanced use, this could parse conditions and manage parameters like where()
+        $this->havingCondition = $conditions;
+        return $this;
+    }
+
+
     /**
      * Builds and returns the SQL query string for SELECT statements.
      *
@@ -158,27 +350,55 @@ class QueryBuilder
             throw new \LogicException("Cannot build SELECT query without a FROM table.");
         }
 
-        $sql = "SELECT " . implode(', ', $this->selectColumns) . " FROM {$this->fromTable}";
+        $sqlParts = [];
+        $sqlParts[] = "SELECT " . implode(', ', $this->selectColumns);
+        $sqlParts[] = "FROM {$this->fromTable}";
 
         if ($this->fromAlias) {
-            $sql .= " AS {$this->fromAlias}";
+            $sqlParts[] = "AS {$this->fromAlias}";
         }
 
-        if (!empty($this->whereClauses)) {
-            $sql .= " WHERE ";
-            foreach ($this->whereClauses as $i => $clause) {
-                if ($i > 0) {
-                    $sql .= " {$clause['boolean']} ";
-                }
-                $sql .= "{$clause['column']} {$clause['operator']} {$clause['value_placeholder']}";
+        // JOINs
+        if (!empty($this->joinClauses)) {
+            foreach($this->joinClauses as $join) {
+                $sqlParts[] = strtoupper($join['type']) . " JOIN {$join['table']} ON {$join['condition']}";
             }
         }
 
+        if (!empty($this->whereClauses)) {
+            $whereParts = [];
+            foreach ($this->whereClauses as $i => $clause) {
+                $prefix = ($i > 0) ? "{$clause['boolean']} " : "";
+                $whereParts[] = $prefix . "{$clause['column']} {$clause['operator']} {$clause['value_placeholder']}";
+            }
+            $sqlParts[] = "WHERE " . implode('', $whereParts);
+        }
+
+        if (!empty($this->groupByColumns)) {
+            $sqlParts[] = "GROUP BY " . implode(', ', $this->groupByColumns);
+        }
+
+        if ($this->havingCondition !== null) {
+            $sqlParts[] = "HAVING " . $this->havingCondition;
+        }
+
         if (!empty($this->orderByClauses)) {
-            $sql .= " ORDER BY " . implode(', ', $this->orderByClauses);
+            $sqlParts[] = "ORDER BY " . implode(', ', $this->orderByClauses);
         }
 
         if ($this->limitValue !== null) {
+            $sqlParts[] = "LIMIT " . $this->limitValue;
+        }
+
+        if ($this->offsetValue !== null) {
+            $sqlParts[] = "OFFSET " . $this->offsetValue;
+        }
+
+        return implode(' ', $sqlParts);
+    }
+
+
+    /**
             $sql .= " LIMIT " . $this->limitValue;
         }
 
@@ -443,7 +663,10 @@ class QueryBuilder
         $this->selectColumns = ['*'];
         $this->fromTable = '';
         $this->fromAlias = null;
+        $this->joinClauses = [];
         $this->whereClauses = [];
+        $this->groupByColumns = [];
+        $this->havingCondition = null;
         $this->orderByClauses = [];
         $this->limitValue = null;
         $this->offsetValue = null;

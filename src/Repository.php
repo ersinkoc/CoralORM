@@ -120,12 +120,31 @@ class Repository
         $tableName = $this->metadata->tableName;
         $query = $this->qb->select()->from($tableName);
 
-        foreach ($criteria as $dbColumnName => $value) {
-            $query->where($dbColumnName, '=', $value);
+        foreach ($criteria as $propertyName => $value) {
+            $columnName = $this->metadata->getColumnNameForProperty($propertyName);
+            if (!$columnName) {
+                // Option 1: Skip if not a mapped property
+                // error_log("Warning: Property '{$propertyName}' not found in metadata for entity {$this->entityClass} during findBy. Skipping.");
+                // continue;
+                // Option 2: Throw an exception for stricter handling
+                throw new \InvalidArgumentException("Property '{$propertyName}' is not a mapped property of entity {$this->entityClass}.");
+            }
+            // TODO: Add support for other operators besides '=' if desired, e.g. $value = ['>', 10]
+            if (is_array($value)) {
+                // Simple IN clause support: $criteria = ['id' => [1, 2, 3]]
+                $query->whereIn($columnName, $value);
+            } else {
+                $query->where($columnName, '=', $value);
+            }
         }
+
         if (!empty($orderBy)) {
-            foreach ($orderBy as $dbColumnName => $direction) {
-                $query->orderBy($dbColumnName, $direction);
+            foreach ($orderBy as $propertyName => $direction) {
+                $columnName = $this->metadata->getColumnNameForProperty($propertyName);
+                if (!$columnName) {
+                     throw new \InvalidArgumentException("Property '{$propertyName}' for orderBy is not a mapped property of entity {$this->entityClass}.");
+                }
+                $query->orderBy($columnName, $direction);
             }
         }
         if ($limit !== null) $query->limit($limit);
@@ -149,6 +168,19 @@ class Repository
     }
 
     /**
+     * Finds a single entity matching specific criteria.
+     *
+     * @param array $criteria Criteria to search by (property_name => value).
+     * @param ?array $orderBy Order by criteria (property_name => 'ASC'|'DESC').
+     * @return ?T The entity instance or null if not found.
+     */
+    public function findOneBy(array $criteria, ?array $orderBy = null): ?Entity
+    {
+        $results = $this->findBy($criteria, $orderBy, 1, null);
+        return $results[0] ?? null;
+    }
+
+    /**
      * Loads specified relations for a collection of entities.
      *
      * @param array<Entity> $entities The primary entities.
@@ -169,8 +201,17 @@ class Repository
 
             if ($relationMeta['type'] === 'BelongsTo') {
                 $this->loadBelongsToRelation($entities, $relationName, $relationMeta);
+            } elseif ($relationMeta['type'] === 'HasMany') {
+                $this->loadHasManyRelation($entities, $relationName, $relationMeta);
+            } elseif ($relationMeta['type'] === 'HasOne') {
+                // HasOne is similar to BelongsTo but with keys reversed, or like HasMany with a single result.
+                // For now, can be a simplified HasMany or needs specific handling if different logic for setting property.
+                // Let's assume it's loaded like HasMany for now, but might need unique result constraint.
+                $this->loadHasManyRelation($entities, $relationName, $relationMeta, true); // true for isHasOne
+            } elseif ($relationMeta['type'] === 'ManyToMany') {
+                $this->loadManyToManyRelation($entities, $relationName, $relationMeta);
             }
-            // TODO: Implement HasOne, HasMany loading
+            // TODO: Ensure all relation types are covered or throw exception for undefined ones
         }
     }
 
@@ -325,6 +366,181 @@ class Repository
         } catch (PDOException | \LogicException $e) {
             error_log("Error in Repository::delete for {$this->entityClass} with PK {$primaryKeyValue}: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Loads a HasMany or HasOne relation for a collection of entities.
+     *
+     * @param array<Entity> $entities
+     * @param string $relationName The name of the property on primary entities to set.
+     * @param array $relationMeta Metadata for the HasMany/HasOne relation.
+     * @param bool $isHasOne Whether this is a HasOne relation (expects single related entity).
+     */
+    protected function loadHasManyRelation(array $entities, string $relationName, array $relationMeta, bool $isHasOne = false): void
+    {
+        $localKeyProperty = $this->metadata->getPropertyForColumnName($relationMeta['localKey']); // Property name for PK on this entity
+        if (!$localKeyProperty) {
+             error_log("Local key property for relation '{$relationName}' not found via column '{$relationMeta['localKey']}' on {$this->entityClass}.");
+             return;
+        }
+
+        $foreignKeyOnRelated = $relationMeta['foreignKey']; // DB Column name on related table that points to this entity's localKey
+        $relatedEntityClass = $relationMeta['relatedEntity'];
+        /** @var EntityMetadata $relatedMetadata */
+        $relatedMetadata = $relatedEntityClass::getMetadata();
+
+        $localKeyValues = [];
+        foreach ($entities as $entity) {
+            $val = $entity->{$localKeyProperty}; // e.g., $post->id
+            if ($val !== null) {
+                $localKeyValues[] = $val;
+            }
+        }
+
+        if (empty($localKeyValues)) {
+            return;
+        }
+        $uniqueLocalKeyValues = array_unique($localKeyValues);
+
+        $relatedRepo = new Repository($this->connection, $relatedEntityClass);
+        // Fetch related entities where their foreign key matches our local key values
+        $relatedObjects = $relatedRepo->findBy([$relatedMetadata->getPropertyForColumnName($foreignKeyOnRelated) => $uniqueLocalKeyValues]);
+
+        // Map related objects back to primary entities
+        $relatedMap = [];
+        foreach ($relatedObjects as $relatedObject) {
+            // The FK value on the related object tells us which parent it belongs to
+            $fkValueOnRelated = $relatedObject->{$relatedMetadata->getPropertyForColumnName($foreignKeyOnRelated)};
+            if ($isHasOne) {
+                $relatedMap[$fkValueOnRelated] = $relatedObject;
+            } else {
+                if (!isset($relatedMap[$fkValueOnRelated])) {
+                    $relatedMap[$fkValueOnRelated] = [];
+                }
+                $relatedMap[$fkValueOnRelated][] = $relatedObject;
+            }
+        }
+
+        foreach ($entities as $entity) {
+            $localVal = $entity->{$localKeyProperty};
+            if ($localVal !== null && isset($relatedMap[$localVal])) {
+                $entity->{$relationName} = $relatedMap[$localVal]; // Assign collection or single object
+            } else {
+                // Ensure the property is set to an empty array for HasMany or null for HasOne if no related found
+                $entity->{$relationName} = $isHasOne ? null : [];
+            }
+        }
+    }
+
+    /**
+     * Loads a ManyToMany relation for a collection of entities.
+     *
+     * @param array<Entity> $entities
+     * @param string $relationName The name of the property on primary entities to set.
+     * @param array $relationMeta Metadata for the ManyToMany relation.
+     */
+    protected function loadManyToManyRelation(array $entities, string $relationName, array $relationMeta): void
+    {
+        $localKeyProperty = $this->metadata->primaryKeyProperty; // Property name for PK on this entity (e.g. 'id')
+         if (!$localKeyProperty) {
+            error_log("Primary key property not defined for entity {$this->entityClass}, required for ManyToMany relation '{$relationName}'.");
+            return;
+        }
+        $localKeyColumnOnThis = $this->metadata->primaryKeyColumn; // DB Column name for PK on this entity (e.g. 'id')
+        if (!$localKeyColumnOnThis) {
+            error_log("Primary key column not defined for entity {$this->entityClass}, required for ManyToMany relation '{$relationName}'.");
+            return;
+        }
+
+
+        $joinTableName = $relationMeta['joinTableName'];
+        $joinLocalKey = $relationMeta['manyToManyLocalKey']; // Column in join table for this entity's ID (e.g., post_id)
+        $joinForeignKey = $relationMeta['manyToManyForeignKey']; // Column in join table for related entity's ID (e.g., tag_id)
+
+        $relatedEntityClass = $relationMeta['relatedEntity'];
+        /** @var EntityMetadata $relatedMetadata */
+        $relatedMetadata = $relatedEntityClass::getMetadata();
+        $relatedPrimaryKeyProperty = $relatedMetadata->primaryKeyProperty; // Property name for PK on related entity
+        $relatedPrimaryKeyColumn = $relatedMetadata->primaryKeyColumn; // DB Column name for PK on related entity
+
+        if (!$relatedPrimaryKeyProperty || !$relatedPrimaryKeyColumn) {
+            error_log("Primary key not defined for related entity {$relatedEntityClass}, required for ManyToMany relation '{$relationName}'.");
+            return;
+        }
+
+        // 1. Collect PKs of the current entities
+        $localPrimaryKeys = [];
+        foreach ($entities as $entity) {
+            $pkValue = $entity->{$localKeyProperty};
+            if ($pkValue !== null) {
+                $localPrimaryKeys[] = $pkValue;
+            }
+        }
+
+        if (empty($localPrimaryKeys)) {
+            foreach ($entities as $entity) { $entity->{$relationName} = []; } // Initialize with empty array
+            return;
+        }
+        $uniqueLocalPrimaryKeys = array_unique($localPrimaryKeys);
+
+        // 2. Query the join table for related entity IDs
+        // SELECT local_key_column, foreign_key_column FROM join_table WHERE local_key_column IN (...)
+        $joinQuery = new QueryBuilder($this->connection);
+        $joinResults = $joinQuery->select([$joinLocalKey, $joinForeignKey])
+            ->from($joinTableName)
+            ->whereIn($joinLocalKey, $uniqueLocalPrimaryKeys)
+            ->fetchAll();
+
+        if (empty($joinResults)) {
+            foreach ($entities as $entity) { $entity->{$relationName} = []; }
+            return;
+        }
+
+        // 3. Collect all unique related entity IDs from the join table results
+        $relatedForeignKeyValues = [];
+        // Map: localPKValue => [relatedFKValue1, relatedFKValue2, ...]
+        $localToForeignKeysMap = [];
+        foreach ($joinResults as $row) {
+            $localPkVal = $row[$joinLocalKey];
+            $foreignPkVal = $row[$joinForeignKey];
+            $relatedForeignKeyValues[] = $foreignPkVal;
+            if (!isset($localToForeignKeysMap[$localPkVal])) {
+                $localToForeignKeysMap[$localPkVal] = [];
+            }
+            $localToForeignKeysMap[$localPkVal][] = $foreignPkVal;
+        }
+        $uniqueRelatedForeignKeyValues = array_unique($relatedForeignKeyValues);
+
+        if (empty($uniqueRelatedForeignKeyValues)) {
+             foreach ($entities as $entity) { $entity->{$relationName} = []; }
+             return;
+        }
+
+        // 4. Fetch all related entities
+        $relatedRepo = new Repository($this->connection, $relatedEntityClass);
+        // Find related entities where their PK is in the list of $uniqueRelatedForeignKeyValues
+        $relatedObjects = $relatedRepo->findBy([$relatedPrimaryKeyProperty => $uniqueRelatedForeignKeyValues]);
+
+
+        // 5. Map related objects back to their parent entities
+        // Create a map of related_pk_value => related_object_instance for quick lookup
+        $relatedObjectsMap = [];
+        foreach ($relatedObjects as $relatedObject) {
+            $relatedObjectsMap[$relatedObject->{$relatedPrimaryKeyProperty}] = $relatedObject;
+        }
+
+        foreach ($entities as $entity) {
+            $entityLocalPkValue = $entity->{$localKeyProperty};
+            $collection = [];
+            if (isset($localToForeignKeysMap[$entityLocalPkValue])) {
+                foreach ($localToForeignKeysMap[$entityLocalPkValue] as $relatedFkValue) {
+                    if (isset($relatedObjectsMap[$relatedFkValue])) {
+                        $collection[] = $relatedObjectsMap[$relatedFkValue];
+                    }
+                }
+            }
+            $entity->{$relationName} = $collection; // Assign the collection of related entities
         }
     }
 }
