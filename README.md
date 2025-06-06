@@ -1,63 +1,350 @@
-# PHP ORM
+# YourOrm - A PHP ORM
 
-A simple and lightweight Object-Relational Mapper (ORM) for PHP.
+A simple and lightweight Object-Relational Mapper (ORM) for PHP, refactored to use the `YourOrm` namespace.
 
 ## Features
 
-*   **Entities**: Represent database tables as PHP objects.
-*   **Repositories**: Provide a way to interact with entities and perform database operations.
-*   **Query Builder**: A fluent interface for building complex SQL queries.
-*   **Migrations**: Manage database schema changes over time.
+*   **Entities**: Represent database tables as PHP objects (`YourOrm\Entity`).
+*   **Repositories**: Provide a way to interact with entities and perform database operations (`YourOrm\Repository`).
+*   **Query Builder**: A fluent interface for building complex SQL queries (`YourOrm\QueryBuilder`).
+*   **Migrations**: Manage database schema changes over time (`YourOrm\Migration\Migrator`, `YourOrm\Migration\AbstractMigration`).
 
 ## Installation
 
-To install the ORM, you will need Composer. If you don't have Composer installed, you can download it from [getcomposer.org](https://getcomposer.org/).
+This project is primarily a standalone library.
 
-Once you have Composer installed, you can add the ORM as a dependency to your project:
+**For users integrating the ORM into their own project:**
+You would typically copy the ORM's `src` directory into your project (e.g., into `lib/your-orm/src/`) and configure your project's `composer.json` to autoload the `YourOrm` namespace.
 
-```bash
-composer require your-vendor/php-orm
+Example `composer.json` snippet for your project:
+```json
+{
+    "autoload": {
+        "psr-4": {
+            "YourOrm\\": "lib/your-orm/src/"
+        }
+    }
+}
+```
+Then run `composer dump-autoload` in your project.
+
+**For developers working on the ORM itself:**
+Running `composer install` in the ORM project root is sufficient to set up autoloading for `src/` (as `YourOrm\\`) and `tests/` (as `Tests\\YourOrm\\`) based on the existing `composer.json` in this repository.
+
+## Configuration
+
+Database connection parameters are required to use the ORM.
+
+1.  **Configuration File:**
+    *   Copy the template `examples/config.php.dist` to `examples/config.php`.
+    *   Update `examples/config.php` with your actual database credentials.
+
+2.  **Required Parameters:**
+    *   `db_host`: Hostname of your database server (e.g., `localhost`, `127.0.0.1`).
+    *   `db_name`: Name of your database.
+    *   `db_user`: Database username.
+    *   `db_pass`: Database password.
+
+3.  **Instantiating Connection:**
+    You can instantiate `YourOrm\Connection` directly:
+    ```php
+    use YourOrm\Connection;
+
+    $connection = new Connection('localhost', 'my_user', 'my_password', 'my_database');
+    ```
+    The `examples/bootstrap.php` file demonstrates loading these parameters from `examples/config.php` and provides a `get_db_connection()` helper function for convenience in the example scripts.
+
+## Core Concepts
+
+### Entity (`YourOrm\Entity`)
+Entities are PHP objects that represent rows in your database tables. You define an entity by creating a class that extends `YourOrm\Entity`. Database table and column mapping is typically done using attributes from the `YourOrm\Mapping` namespace (e.g., `#[Table]`, `#[Column]`, `#[PrimaryKey]`).
+
+### Repository (`YourOrm\Repository`)
+Repositories are responsible for finding and persisting entities. Each entity typically has its own repository. You instantiate a repository with a `Connection` object and the fully qualified class name of the entity it manages (e.g., `new Repository($connection, User::class)`). It provides methods like `find()`, `findAll()`, `findBy()`, `save()`, and `delete()`.
+
+### QueryBuilder (`YourOrm\QueryBuilder`)
+For queries more complex than what the Repository offers, the `QueryBuilder` provides a fluent programmatic interface to construct SQL queries. You instantiate it with a `Connection` object (e.g., `new QueryBuilder($connection)`). It allows you to build detailed SELECT, INSERT, UPDATE, and DELETE statements.
+
+### Migrations (`YourOrm\Migration\AbstractMigration`, `YourOrm\Migration\Migrator`)
+Migrations help manage incremental and reversible changes to your database schema. You create migration classes by extending `YourOrm\Migration\AbstractMigration` and define `up()` and `down()` methods using `YourOrm\Migration\SchemaBuilder`. The `YourOrm\Migration\Migrator` service, typically used via `orm-cli.php`, is used to apply or roll back migrations.
+
+## Defining Entities
+
+Entities are the cornerstone of YourOrm, representing the structure of your database tables as PHP objects. They extend the base `YourOrm\Entity` class, and their mapping to the database is defined using attributes from the `YourOrm\Mapping` namespace.
+
+### Table Name (`#[Table]`)
+The `#[Table]` attribute specifies the database table name for an entity.
+
+*   **Usage:** `#[Table(name: 'your_table_name')]`
+*   **Example:**
+    ```php
+    use YourOrm\Mapping\Table;
+
+    #[Table(name: 'app_users')]
+    class User extends YourOrm\Entity
+    {
+        // ...
+    }
+    ```
+*   **Default:** If `#[Table]` is omitted, the table name is generated by converting the entity class name to snake_case and pluralizing it (e.g., `ProductCategory` becomes `product_categories`).
+
+### Columns (`#[Column]`)
+The `#[Column]` attribute maps an entity property to a database table column.
+
+*   **Usage:** `#[Column(name: 'db_column_name', type: 'php_type')]`
+    *   `name` (string, optional): The actual column name in the database. If omitted, it defaults to the property name converted to snake_case (e.g., `firstName` property becomes `first_name` column).
+    *   `type` (string, optional): The PHP type the ORM should cast the column value to when hydrating the entity, and cast from when persisting. While optional, it's highly recommended for clarity and correct type handling. Common types include:
+        *   `'string'`
+        *   `'int'` or `'integer'`
+        *   `'bool'` or `'boolean'`
+        *   `'float'` or `'double'`
+        *   `'DateTimeImmutable'` (for date/time columns)
+        *   `'array'` (for columns storing JSON data)
+*   **Examples:**
+    ```php
+    use YourOrm\Mapping\Column;
+    use DateTimeImmutable;
+
+    // ...
+    #[Column(name: 'user_name', type: 'string')]
+    public ?string $username = null;
+
+    #[Column(type: 'int')] // DB column will be 'login_attempts'
+    public ?int $loginAttempts = null;
+
+    #[Column(type: 'bool')]
+    public ?bool $isActive = true;
+
+    #[Column(type: 'DateTimeImmutable')]
+    public ?DateTimeImmutable $lastLogin = null;
+    ```
+
+### Primary Key (`#[PrimaryKey]`)
+The `#[PrimaryKey]` attribute marks a property as the primary key for the entity.
+
+*   **Usage:** `#[PrimaryKey(autoIncrement: true)]`
+    *   `autoIncrement` (bool, optional): Specifies if the primary key is auto-incrementing. Defaults to `true`.
+*   **Example:**
+    ```php
+    use YourOrm\Mapping\PrimaryKey;
+    use YourOrm\Mapping\Column;
+
+    // ...
+    #[PrimaryKey] // autoIncrement defaults to true
+    #[Column(name: 'id', type: 'int')] // Often combined with Column
+    public ?int $id = null;
+    ```
+*   **Default Behavior:** If no `#[PrimaryKey]` attribute is present, the ORM will look for a property named `id` and assume it's the auto-incrementing primary key.
+
+### Automatic Timestamps (`#[CreatedAt]`, `#[UpdatedAt]`)
+These attributes automatically manage timestamping for entity creation and updates.
+
+*   `#[CreatedAt]`: Sets the property to the current timestamp when the entity is first saved.
+*   `#[UpdatedAt]`: Sets the property to the current timestamp whenever the entity is saved (both on creation and update).
+*   **Parameters:**
+    *   `name` (string, optional): Allows specifying a different database column name if the default (property name converted to snake_case) is not desired. However, it's often clearer to use `#[Column(name: 'custom_name')]` alongside these.
+*   **Type Recommendation:** It's recommended to type these properties as `?DateTimeImmutable`. The ORM will automatically handle the conversion.
+*   **Example:**
+    ```php
+    use YourOrm\Mapping\CreatedAt;
+    use YourOrm\Mapping\UpdatedAt;
+    use YourOrm\Mapping\Column;
+    use DateTimeImmutable;
+
+    // ...
+    #[CreatedAt]
+    #[Column(type: 'DateTimeImmutable')] // DB column: 'created_at'
+    public ?DateTimeImmutable $createdAt = null;
+
+    #[UpdatedAt]
+    #[Column(name: 'last_modified_on', type: 'DateTimeImmutable')] // Custom column name
+    public ?DateTimeImmutable $updatedAt = null;
+    ```
+
+### Constraints (`#[NotNull]`, `#[Length]`)
+These attributes define basic validation constraints that can be checked before an entity is persisted. *Note: These are for pre-persistence validation within the ORM; database-level constraints should still be defined in your schema for data integrity.*
+
+*   **`#[NotNull]`**: Marks a property as non-nullable. The ORM may check this before saving.
+    ```php
+    use YourOrm\Mapping\NotNull;
+    use YourOrm\Mapping\Column;
+
+    // ...
+    #[NotNull]
+    #[Column(type: 'string')]
+    public ?string $username = null;
+    ```
+    *Note: The `#[Column]` attribute itself does not currently have a `nullable: false` option, so `#[NotNull]` is the primary way to indicate this requirement at the ORM level.*
+
+*   **`#[Length(min: ?int, max: ?int)]`**: Specifies the minimum and/or maximum length for a string property.
+    ```php
+    use YourOrm\Mapping\Length;
+    use YourOrm\Mapping\Column;
+
+    // ...
+    #[Length(max: 255)]
+    #[Column(type: 'string')]
+    public ?string $description = null;
+
+    #[Length(min: 8, max: 100)]
+    #[Column(type: 'string')]
+    public ?string $passwordHash = null;
+    ```
+
+### Full Entity Example
+Here's an example of a `User` entity showcasing various attributes:
+
+```php
+namespace App\Entity; // Example namespace for your project
+
+use YourOrm\Entity;
+use YourOrm\Mapping\Table;
+use YourOrm\Mapping\Column;
+use YourOrm\Mapping\PrimaryKey;
+use YourOrm\Mapping\CreatedAt;
+use YourOrm\Mapping\UpdatedAt;
+use YourOrm\Mapping\NotNull;
+use YourOrm\Mapping\Length;
+use DateTimeImmutable;
+
+#[Table(name: 'app_users')]
+class User extends Entity
+{
+    #[PrimaryKey]
+    #[Column(name: 'user_id', type: 'int')]
+    public ?int $id = null;
+
+    #[NotNull]
+    #[Length(min: 3, max: 50)]
+    #[Column(name: 'username', type: 'string')]
+    public ?string $username = null;
+
+    #[NotNull]
+    #[Length(max: 100)]
+    #[Column(name: 'email_address', type: 'string', unique: true)] // Assuming 'unique' might be used by schema generation or validation
+    public ?string $email = null;
+
+    #[Column(name: 'is_active', type: 'bool')]
+    public ?bool $isActive = false;
+
+    #[Column(name: 'profile_bio', type: 'string', nullable: true)] // Assuming schema builder could use 'nullable'
+    #[Length(max: 500)]
+    public ?string $bio = null;
+
+    #[CreatedAt]
+    #[Column(type: 'DateTimeImmutable')]
+    public ?DateTimeImmutable $createdAt = null;
+
+    #[UpdatedAt]
+    #[Column(type: 'DateTimeImmutable')]
+    public ?DateTimeImmutable $updatedAt = null;
+}
 ```
 
-## Usage
+### Property Access and Type Casting
+The base `YourOrm\Entity` class uses magic `__get` and `__set` methods. When you set a property that's mapped with `#[Column(type: 'some_type')]`, the `__set` method attempts to cast the value to the specified PHP type. Similarly, `__get` ensures data is returned as the correct type.
+
+While magic methods provide this convenience, you are free to define explicit public properties and traditional getter/setter methods in your entity classes if you prefer more direct control or need custom logic.
+
+### Naming Conventions
+YourOrm follows common conventions but allows overrides via attributes:
+
+*   **Table Names:** If `#[Table(name: '...')]` is not specified, the default table name is derived from the entity's class name, converted to snake_case, and pluralized (e.g., `UserRole` becomes `user_roles`, `Product` becomes `products`).
+*   **Column Names:** If `#[Column(name: '...')]` is not specified for a mapped property, the default column name is the property name converted to snake_case (e.g., `firstName` becomes `first_name`).
+
+Attributes always take precedence over these default naming conventions.
+
+## Quick Start Example
 
 Here's a simple example of how to use the ORM:
 
 ```php
 <?php
 
+// Ensure this path is correct for your project structure
+// and that YourOrm classes are autoloadable.
 require_once 'vendor/autoload.php';
 
-use YourVendor\PhpOrm\EntityManager;
-use YourVendor\PhpOrm\Entity\User;
+// For direct usage:
+use YourOrm\Connection;
+use YourOrm\Repository;
 
-// Configure the entity manager
-$entityManager = new EntityManager([
-    'driver' => 'mysql',
-    'host' => 'localhost',
-    'database' => 'your_database',
-    'username' => 'your_username',
-    'password' => 'your_password',
-]);
+// Define your entity (or ensure it's autoloaded)
+// This example defines it inline for brevity.
+namespace MyProject\Entity; // Choose your own project namespace
+
+use YourOrm\Entity;
+use YourOrm\Mapping\Table;
+use YourOrm\Mapping\Column;
+use YourOrm\Mapping\PrimaryKey;
+use YourOrm\Mapping\CreatedAt;
+use DateTimeImmutable; // Remember to import DateTimeImmutable
+
+#[Table(name: 'users')]
+class User extends Entity
+{
+    #[PrimaryKey(autoIncrement: true)]
+    #[Column(type: 'int')]
+    public ?int $id = null;
+
+    #[Column(type: 'string')]
+    public ?string $name = null;
+
+    #[Column(type: 'string', unique: true)]
+    public ?string $email = null;
+
+    #[CreatedAt] // This implies the column type will be handled by the ORM, often as DateTimeImmutable
+    #[Column(type: 'DateTimeImmutable')] // Explicitly define type for clarity
+    public ?DateTimeImmutable $created_at = null;
+
+    // Getter for example
+    public function getName(): ?string { return $this->name; }
+}
+
+
+// --- Main Application Code ---
+// Use the namespace of your User entity
+use MyProject\Entity\User;
+
+// Database configuration (replace with your actual config)
+$dbConfig = [
+    'db_host' => 'localhost',
+    'db_user' => 'your_username',
+    'db_pass' => 'your_password',
+    'db_name' => 'your_database',
+];
+
+$connection = new Connection(
+    $dbConfig['db_host'],
+    $dbConfig['db_user'],
+    $dbConfig['db_pass'],
+    $dbConfig['db_name']
+);
+
+// Create a repository for the User entity
+$userRepository = new Repository($connection, User::class);
 
 // Create a new user
 $user = new User();
-$user->setName('John Doe');
-$user->setEmail('john.doe@example.com');
+$user->name = 'John Doe'; // Using magic setter
+$user->email = 'john.doe.' . time() . '@example.com';
 
 // Persist the user to the database
-$entityManager->persist($user);
-$entityManager->flush();
+if ($userRepository->save($user)) {
+    echo "User '{$user->getName()}' created with ID: {$user->id}\n";
+} else {
+    echo "Failed to create user.\n";
+}
 
 // Find a user by ID
-$foundUser = $entityManager->getRepository(User::class)->find(1);
+$foundUser = $userRepository->find($user->id ?? 1); // Use ID from saved user or a fallback
 
 if ($foundUser) {
-    echo "Found user: " . $foundUser->getName() . "\n";
+    echo "Found user: " . $foundUser->name . "\n"; // Using magic getter
 }
 
 ?>
 ```
 
-This is a basic example, and the ORM offers more advanced features like relationships, query building, and migrations. Refer to the documentation for more details.
+This is a basic example. The ORM offers more advanced features like relationships, a more detailed query builder, and migrations. Refer to the `examples/` directory for more detailed usage scenarios.
 ```

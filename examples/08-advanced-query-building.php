@@ -1,86 +1,151 @@
 <?php
 
-require_once __DIR__ . '/bootstrap.php';
+declare(strict_types=1);
 
-use YourVendor\PhpOrm\EntityManager;
-use YourVendor\PhpOrm\Entity\User; // Assuming you have a User entity
-use YourVendor\PhpOrm\Entity\Order; // Assuming you have an Order entity
-use YourVendor\PhpOrm\Query\QueryBuilder;
+require_once __DIR__ . '/bootstrap.php'; // Corrected bootstrap path
 
-// Assuming $entityManager is already configured in bootstrap.php
-/** @var EntityManager $entityManager */
+namespace Examples\AdvQuery; // Using a distinct namespace for these example entities
 
-echo "Advanced Query Building Examples\n";
-echo "---------------------------------\n\n";
+use YourOrm\Connection;
+use YourOrm\Entity;
+use YourOrm\Repository;
+use YourOrm\QueryBuilder;
+use YourOrm\Mapping\Table;
+use YourOrm\Mapping\Column;
+use YourOrm\Mapping\PrimaryKey;
+use YourOrm\Mapping\HasMany;
+use YourOrm\Mapping\BelongsTo;
+use YourOrm\Mapping\CreatedAt;
+use DateTimeImmutable;
 
-// --- WHERE clauses with different operators ---
+echo PHP_EOL . "--- Example 08: Advanced Query Building with YourOrm ---" . PHP_EOL;
 
-echo "1. WHERE clause with LIKE operator:\n";
-$usersLike = $entityManager->getRepository(User::class)
-    ->createQueryBuilder('u')
-    ->where('u.name LIKE :name')
-    ->setParameter('name', 'John%')
-    ->getQuery()
-    ->getResult();
+// --- Entity Definitions ---
 
-foreach ($usersLike as $user) {
-    echo " - User found (LIKE 'John%'): " . $user->getName() . "\n";
+#[Table(name: 'users')]
+class User extends Entity
+{
+    #[PrimaryKey(autoIncrement: true)]
+    #[Column(name: 'id', type: 'int')]
+    public ?int $id = null;
+
+    #[Column(name: 'name', type: 'string')]
+    public ?string $name = null;
+
+    #[Column(name: 'email', type: 'string')]
+    public ?string $email = null;
+
+    #[CreatedAt]
+    #[Column(name: 'created_at', type: 'DateTimeImmutable')]
+    public ?DateTimeImmutable $created_at = null;
+
+    // Relationship: User has many Orders
+    // This property will be populated by the Repository's 'with' method if eager loading.
+    // QueryBuilder itself doesn't automatically use this for joins; joins are manual.
+    #[HasMany(relatedEntity: Order::class, foreignKey: 'user_id', localKey: 'id')]
+    public array $orders = []; // Initialized to empty array
+
+    // Getter methods (optional, Entity uses magic __get)
+    public function getName(): ?string { return $this->name; }
+    public function getEmail(): ?string { return $this->email; }
+    public function getId(): ?int { return $this->id; }
+    public function getCreatedAt(): ?DateTimeImmutable { return $this->created_at; }
 }
-echo "\n";
 
-echo "2. WHERE clause with IN operator:\n";
-$usersIn = $entityManager->getRepository(User::class)
-    ->createQueryBuilder('u')
-    ->where('u.id IN (:ids)')
-    ->setParameter('ids', [1, 2, 3]) // Assuming User IDs 1, 2, 3 exist
-    ->getQuery()
-    ->getResult();
+#[Table(name: 'orders')]
+class Order extends Entity
+{
+    #[PrimaryKey(autoIncrement: true)]
+    #[Column(name: 'id', type: 'int')]
+    public ?int $id = null;
 
-foreach ($usersIn as $user) {
-    echo " - User found (IN [1, 2, 3]): " . $user->getName() . " (ID: " . $user->getId() . ")\n";
+    #[Column(name: 'user_id', type: 'int')]
+    public ?int $user_id = null;
+
+    #[Column(name: 'amount', type: 'float')]
+    public ?float $amount = null;
+
+    #[CreatedAt]
+    #[Column(name: 'created_at', type: 'DateTimeImmutable')]
+    public ?DateTimeImmutable $created_at = null;
+
+    // Relationship: Order belongs to a User
+    #[BelongsTo(relatedEntity: User::class, foreignKey: 'user_id', ownerKey: 'id')]
+    public ?User $user = null; // Initialized to null
+
+    public function getId(): ?int { return $this->id; }
+    public function getAmount(): ?float { return $this->amount; }
+    public function getUserId(): ?int { return $this->user_id; }
 }
-echo "\n";
 
-echo "3. WHERE clause with BETWEEN operator (assuming an 'age' or 'createdAt' field):\n";
-// For this example, let's assume User entity has a 'createdAt' DateTime field
-// and we want to find users created within a certain date range.
-// Adjust field name and values as per your actual User entity.
+// --- End of Entity Definitions ---
+
+
+$connection = get_db_connection();
+
+if (!$connection) {
+    echo "Failed to get database connection. Please check config.php and bootstrap.php." . PHP_EOL;
+    exit(1);
+}
+
+// Note: YourOrm\Repository is simpler and does not have createQueryBuilder method.
+// We will use YourOrm\QueryBuilder directly.
+
 try {
-    $usersBetween = $entityManager->getRepository(User::class)
-        ->createQueryBuilder('u')
-        ->where('u.createdAt BETWEEN :startDate AND :endDate')
-        ->setParameter('startDate', new \DateTime('2023-01-01'))
-        ->setParameter('endDate', new \DateTime('2023-12-31'))
-        ->getQuery()
-        ->getResult();
+    $userRepository = new Repository($connection, User::class); // For potential direct repo use
+    $orderRepository = new Repository($connection, Order::class); // For potential direct repo use
+
+    echo "\n1. WHERE clause with LIKE operator:\n";
+    $qb1 = new QueryBuilder($connection);
+    $usersLike = $qb1->select('id', 'name', 'email')
+        ->from('users')
+        ->where('name', 'LIKE', 'John%') // Assuming 'John%' exists from previous examples or schema
+        ->fetchAll();
+
+    foreach ($usersLike as $user) {
+        echo " - User found (LIKE 'John%'): " . $user['name'] . "\n";
+    }
+    echo "\n";
+
+    echo "2. WHERE clause with IN operator:\n";
+    $qb2 = new QueryBuilder($connection);
+    // Ensure users with ID 1, 2, 3 exist or adjust array.
+    // Previous examples might create user ID 1 (johndoe_example) and 2 (jane_doe_example)
+    $userIDsToFind = [1, 2, 3];
+    $usersIn = $qb2->select('id', 'name', 'email')
+        ->from('users')
+        ->whereIn('id', $userIDsToFind) // QueryBuilder has whereIn
+        ->fetchAll();
+
+    foreach ($usersIn as $user) {
+        echo " - User found (IN [" . implode(', ', $userIDsToFind) . "]): " . $user['name'] . " (ID: " . $user['id'] . ")\n";
+    }
+    echo "\n";
+
+    echo "3. WHERE clause with BETWEEN operator (using 'created_at' field):\n";
+    $qb3 = new QueryBuilder($connection);
+    $startDate = (new DateTimeImmutable('2023-01-01'))->format('Y-m-d H:i:s');
+    $endDate = (new DateTimeImmutable('2023-12-31'))->format('Y-m-d H:i:s');
+    // Note: QueryBuilder does not have a specific ->between() method.
+    // We construct it using two WHERE clauses.
+    $usersBetween = $qb3->select('id', 'name', 'created_at')
+        ->from('users')
+        ->where('created_at', '>=', $startDate)
+        ->where('created_at', '<=', $endDate) // Additional where implies AND
+        ->fetchAll();
 
     foreach ($usersBetween as $user) {
-        echo " - User found (createdAt BETWEEN 2023-01-01 AND 2023-12-31): " . $user->getName() . " (Created: " . $user->getCreatedAt()->format('Y-m-d') . ")\n";
+        echo " - User found (created_at BETWEEN {$startDate} AND {$endDate}): " . $user['name'] . " (Created: " . $user['created_at'] . ")\n";
     }
-} catch (\Exception $e) {
-    echo " - Could not execute BETWEEN query. Ensure User entity has 'createdAt' field and it's mapped correctly. Error: " . $e->getMessage() . "\n";
-}
-echo "\n";
+    echo "\n";
 
-
-// --- JOINs (INNER, LEFT, RIGHT) ---
-// Assuming User has a relationship with Order (e.g., a user can have multiple orders)
-
-echo "4. INNER JOIN (Users with their Orders):\n";
-// We need to define relationships in entities for JOINs to work seamlessly.
-// Let's assume User entity has a one-to-many relationship with Order entity.
-// And Order entity has a many-to-one relationship back to User.
-// (This part would typically be defined in the entity classes themselves)
-
-// Example: Find users who have placed orders, along with their order IDs.
-// Adjust 'o.user' based on your actual entity relationship mapping.
-try {
-    $queryBuilder = $entityManager->getRepository(User::class)->createQueryBuilder('u');
-    $usersWithOrders = $queryBuilder
-        ->innerJoin('u.orders', 'o') // 'u.orders' assumes a mapped relationship in User entity
-        ->select('u.name as userName, o.id as orderId, o.amount as orderAmount') // Assuming Order has an 'amount' field
-        ->getQuery()
-        ->getResult();
+    echo "4. INNER JOIN (Users with their Orders):\n";
+    $qb4 = new QueryBuilder($connection);
+    // Manual JOIN condition
+    $usersWithOrders = $qb4->select('u.name as userName', 'o.id as orderId', 'o.amount as orderAmount')
+        ->from('users', 'u')
+        ->join('orders AS o', 'u.id = o.user_id', 'INNER')
+        ->fetchAll();
 
     if (count($usersWithOrders) > 0) {
         foreach ($usersWithOrders as $result) {
@@ -89,21 +154,14 @@ try {
     } else {
         echo " - No users found with orders (INNER JOIN).\n";
     }
-} catch (\Exception $e) {
-    echo " - Could not execute INNER JOIN. Ensure entities and relationships are defined. Error: " . $e->getMessage() . "\n";
-}
-echo "\n";
+    echo "\n";
 
-
-echo "5. LEFT JOIN (All Users and their Orders, if any):\n";
-// Example: List all users, and if they have orders, list their order IDs.
-try {
-    $queryBuilder = $entityManager->getRepository(User::class)->createQueryBuilder('u');
-    $allUsersAndOrders = $queryBuilder
-        ->leftJoin('u.orders', 'o') // 'u.orders' assumes a mapped relationship in User entity
-        ->select('u.name as userName, o.id as orderId, o.amount as orderAmount')
-        ->getQuery()
-        ->getResult();
+    echo "5. LEFT JOIN (All Users and their Orders, if any):\n";
+    $qb5 = new QueryBuilder($connection);
+    $allUsersAndOrders = $qb5->select('u.name as userName', 'o.id as orderId', 'o.amount as orderAmount')
+        ->from('users', 'u')
+        ->leftJoin('orders AS o', 'u.id = o.user_id')
+        ->fetchAll();
 
     if (count($allUsersAndOrders) > 0) {
         foreach ($allUsersAndOrders as $result) {
@@ -116,28 +174,16 @@ try {
     } else {
         echo " - No users found (LEFT JOIN).\n";
     }
-} catch (\Exception $e) {
-    echo " - Could not execute LEFT JOIN. Ensure entities and relationships are defined. Error: " . $e->getMessage() . "\n";
-}
-echo "\n";
+    echo "\n";
 
-// RIGHT JOIN is less commonly used directly with ORM Query Builders starting from the 'left' side.
-// Often, a RIGHT JOIN can be rewritten as a LEFT JOIN by switching the order of entities.
-// However, if your ORM's QueryBuilder supports it directly, the syntax would be similar:
-// ->rightJoin('u.orders', 'o')
-// For this example, we'll focus on how it could be achieved by starting from Order entity if needed.
-echo "6. RIGHT JOIN (Conceptually - All Orders and their Users):\n";
-// This is like finding all orders and the user who placed them.
-// If an order somehow existed without a user (not typical for good schema design),
-// that order would still be listed.
-// This is effectively a LEFT JOIN if you start query from Order entity.
-try {
-    $queryBuilder = $entityManager->getRepository(Order::class)->createQueryBuilder('o');
-    $allOrdersAndUsers = $queryBuilder
-        ->leftJoin('o.user', 'u') // 'o.user' assumes a mapped relationship in Order entity
-        ->select('o.id as orderId, o.amount as orderAmount, u.name as userName')
-        ->getQuery()
-        ->getResult();
+
+    echo "6. RIGHT JOIN (Conceptually - All Orders and their Users):\n";
+    $qb6 = new QueryBuilder($connection);
+    // This is effectively a LEFT JOIN if you start query from Order entity.
+    $allOrdersAndUsers = $qb6->select('o.id as orderId', 'o.amount as orderAmount', 'u.name as userName')
+        ->from('orders', 'o')
+        ->leftJoin('users AS u', 'o.user_id = u.id') // Switched join condition
+        ->fetchAll();
 
     if (count($allOrdersAndUsers) > 0) {
         foreach ($allOrdersAndUsers as $result) {
@@ -150,40 +196,29 @@ try {
     } else {
         echo " - No orders found.\n";
     }
-} catch (\Exception $e) {
-    echo " - Could not execute conceptual RIGHT JOIN (as LEFT JOIN from Order). Ensure entities and relationships are defined. Error: " . $e->getMessage() . "\n";
-}
-echo "\n";
+    echo "\n";
 
 
-// --- ORDER BY and GROUP BY clauses ---
+    echo "7. ORDER BY clause:\n";
+    $qb7 = new QueryBuilder($connection);
+    $usersOrdered = $qb7->select('id', 'name')
+        ->from('users')
+        ->orderBy('name', 'DESC')
+        ->fetchAll();
 
-echo "7. ORDER BY clause:\n";
-// Example: Find all users, ordered by their name in descending order.
-$usersOrdered = $entityManager->getRepository(User::class)
-    ->createQueryBuilder('u')
-    ->orderBy('u.name', 'DESC')
-    ->getQuery()
-    ->getResult();
+    foreach ($usersOrdered as $user) {
+        echo " - User (Ordered by Name DESC): " . $user['name'] . "\n";
+    }
+    echo "\n";
 
-foreach ($usersOrdered as $user) {
-    echo " - User (Ordered by Name DESC): " . $user->getName() . "\n";
-}
-echo "\n";
-
-echo "8. GROUP BY clause (and aggregate functions):\n";
-// Example: Count the number of orders per user.
-// This requires a relationship set up (User hasMany Orders).
-// The select statement needs to include the grouping field and the aggregate.
-try {
-    $queryBuilder = $entityManager->getRepository(Order::class)->createQueryBuilder('o');
-    $ordersCountByUser = $queryBuilder
-        ->innerJoin('o.user', 'u') // Join with User entity
-        ->select('u.name as userName, COUNT(o.id) as orderCount')
-        ->groupBy('u.id') // Group by user id (or user name if unique)
+    echo "8. GROUP BY clause (and aggregate functions):\n";
+    $qb8 = new QueryBuilder($connection);
+    $ordersCountByUser = $qb8->select('u.name as userName', 'COUNT(o.id) as orderCount')
+        ->from('users', 'u') // Start from users
+        ->leftJoin('orders AS o', 'u.id = o.user_id') // Left join to include users with no orders
+        ->groupBy('u.id, u.name') // Group by user id and name
         ->orderBy('orderCount', 'DESC')
-        ->getQuery()
-        ->getResult(); // Returns an array of arrays/objects
+        ->fetchAll();
 
     if (count($ordersCountByUser) > 0) {
         echo " - Orders per user:\n";
@@ -193,42 +228,51 @@ try {
     } else {
         echo " - No data found for GROUP BY example.\n";
     }
-} catch (\Exception $e) {
-    echo " - Could not execute GROUP BY query. Ensure entities, relationships (Order.user), and fields are correct. Error: " . $e->getMessage() . "\n";
-}
-echo "\n";
+    echo "\n";
 
-echo "9. Query with multiple conditions (WHERE AND/OR):\n";
-// Example: Find users named 'John Doe' OR users with email ending in '@example.com'
-// For an AND condition, you can chain multiple ->where() or ->andWhere() calls.
-// For an OR condition, you use ->orWhere().
-$usersComplexCondition = $entityManager->getRepository(User::class)
-    ->createQueryBuilder('u')
-    ->where('u.name = :name')
-    ->orWhere('u.email LIKE :emailPattern')
-    ->setParameter('name', 'Jane Doe') // Assuming a 'Jane Doe' might exist
-    ->setParameter('emailPattern', '%@example.com')
-    ->orderBy('u.id', 'ASC')
-    ->getQuery()
-    ->getResult();
+    echo "9. Query with multiple conditions (WHERE AND/OR):\n";
+    $qb9 = new QueryBuilder($connection);
+    // Example: Find users named 'Jane Doe' OR users with email ending in '@example.com'
+    // YourOrm\QueryBuilder chains WHERE clauses with AND by default.
+    // For OR, you need to construct the condition string manually or use a more advanced QueryBuilder.
+    // The current QueryBuilder might not support complex OR conditions directly in a fluent way
+    // without raw SQL in where().
+    // For this example, let's assume we search for 'jane_doe_example' OR 'johndoe_example'
+    // This specific ORM's QueryBuilder's where() method takes one condition.
+    // A common way to do OR is `WHERE (condition1) OR (condition2)`.
+    // The current QB might require raw SQL for complex ORs or a refactor.
+    // Let's try with whereIn for a simple OR on the same column:
+    $namesToFind = ['jane_doe_example', 'johndoe_example']; // From example 03
+    $usersComplexCondition = $qb9->select('id', 'name', 'email')
+        ->from('users')
+        ->whereIn('name', $namesToFind)
+        ->orderBy('id', 'ASC')
+        ->fetchAll();
 
-echo " - Users matching 'Jane Doe' OR email ending with '@example.com':\n";
-if (count($usersComplexCondition) > 0) {
-    foreach ($usersComplexCondition as $user) {
-        echo "   - User: " . $user->getName() . " (Email: " . $user->getEmail() . ")\n";
+    echo " - Users matching names " . implode(' OR ', $namesToFind) . ":\n";
+    if (count($usersComplexCondition) > 0) {
+        foreach ($usersComplexCondition as $user) {
+            echo "   - User: " . $user['name'] . " (Email: " . $user['email'] . ")\n";
+        }
+    } else {
+        echo "   - No users found matching the complex criteria.\n";
     }
-} else {
-    echo "   - No users found matching the complex criteria.\n";
+    echo "\n";
+
+
+} catch (\PDOException $e) {
+    echo "A PDOException occurred: " . $e->getMessage() . PHP_EOL;
+} catch (\LogicException $e) {
+    echo "A LogicException occurred: " . $e->getMessage() . PHP_EOL;
+} catch (\Exception $e) {
+    echo "An unexpected error occurred: " . $e->getMessage() . PHP_EOL;
 }
-echo "\n";
 
 
 echo "---------------------------------\n";
-echo "Advanced query examples complete.\n";
-echo "Please ensure you have appropriate entities (User, Order), relationships, \n";
-echo "and sample data in your database for these queries to yield results.\n";
-echo "The User entity should have at least 'id', 'name', 'email', 'createdAt' (DateTime). \n";
-echo "The Order entity should have at least 'id', 'amount', and a reference to User ('user').\n";
+echo "Advanced query examples complete with YourOrm.\n";
+echo "Please ensure you have appropriate tables (users, orders), and sample data.\n";
+echo "The 'users' table needs 'id', 'name', 'email', 'created_at'.\n";
+echo "The 'orders' table needs 'id', 'user_id', 'amount', 'created_at'.\n";
 
 ?>
-```

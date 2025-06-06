@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace YourOrm\Migration;
 
+use YourOrm\Connection;
+
 /**
  * Base class for database migrations.
  */

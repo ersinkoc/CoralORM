@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Examples\Entity; // Using a sub-namespace for entities
 
-use App\Entity;
+use YourOrm\Entity;
 
 echo PHP_EOL . "--- Example 02: Defining an Entity ---" . PHP_EOL;
 
