@@ -169,8 +169,24 @@ class Migrator
         try {
             echo "Running up: {$migrationName}" . PHP_EOL;
             $migrationInstance->up($schemaBuilder);
-            $this->logMigration($migrationName, $this->getNextBatchNumber());
+            // Log migration before postUp, so if postUp fails, migration is still marked as run.
+            // Alternatively, log after postUp if postUp failure should mean migration failure.
+            // For now, let's assume up() is the critical part for schema, postUp is auxiliary.
+            $currentBatch = $this->getNextBatchNumber(); // Determine batch number before logging
+            $this->logMigration($migrationName, $currentBatch);
             echo "Finished up: {$migrationName}" . PHP_EOL;
+
+            // Call postUp
+            try {
+                echo "Running postUp for: {$migrationName}" . PHP_EOL;
+                $migrationInstance->postUp($this->connection);
+                echo "Finished postUp for: {$migrationName}" . PHP_EOL;
+            } catch (Throwable $pe) {
+                // Log error in postUp but don't necessarily roll back the main 'up' migration.
+                // This depends on desired transactional behavior.
+                error_log("Error running postUp for migration {$migrationName}: " . $pe->getMessage() . " in " . $pe->getFile() . ":" . $pe->getLine());
+                // Optionally, this could trigger a warning or a specific compensation logic.
+            }
             return true;
         } catch (Throwable $e) { // Catch any error/exception
             error_log("Error running migration {$migrationName} up: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
@@ -202,12 +218,11 @@ class Migrator
     protected function logMigration(string $migrationName, int $batch): void
     {
         $qb = new QueryBuilder($this->connection);
-        // Using QueryBuilder's insert which now correctly builds its SQL and params.
         $qb->insert($this->migrationsTable, [
             'migration' => $migrationName,
             'batch' => $batch,
-            'executed_at' => (new DateTime())->format('Y-m-d H:i:s') // PHP generates timestamp
-        ]);
+            'executed_at' => (new DateTime())->format('Y-m-d H:i:s')
+        ])->execute(); // Added execute() call, as insert() prepares query
     }
 
     protected function unlogMigration(string $migrationName): void
