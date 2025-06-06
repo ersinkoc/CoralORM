@@ -94,28 +94,72 @@ class QueryBuilderTest extends TestCase
         $this->assertEquals([':param0' => true], $this->qb->getParameters());
     }
 
-    public function testInsertQuery()
+    public function testInsertReturnsSelf()
     {
-        // Note: The QueryBuilder's insert() method directly executes.
-        // We are testing the SQL generation part here by manually setting queryType and actionData
-        // This is a way to unit test the SQL building logic if insert() was split into prepareInsert() and execute().
-        // Or, we can mock the connection->execute() call.
-
-        $table = 'users';
-        $data = ['name' => 'John Doe', 'email' => 'john@example.com'];
-
-        // Mock the execute call on the connection
-        $this->connectionMock->expects($this->once())
-            ->method('execute')
-            ->with(
-                "INSERT INTO users (name, email) VALUES (:insert_name, :insert_email)",
-                [':insert_name' => 'John Doe', ':insert_email' => 'john@example.com']
-            )
-            ->willReturn($this->createMock(\PDOStatement::class)); // Assuming execute returns a PDOStatement
-
-        $result = $this->qb->insert($table, $data);
-        $this->assertTrue($result); // If execute doesn't throw, insert returns true
+        $result = $this->qb->insert('users', ['name' => 'Test']);
+        $this->assertSame($this->qb, $result, "Insert method should return self (QueryBuilder instance).");
     }
+
+    public function testGetSqlForInsert()
+    {
+        $this->qb->insert('users', ['name' => 'John Doe', 'email' => 'john@example.com']);
+        $expectedSql = "INSERT INTO users (name, email) VALUES (:insert_name, :insert_email)";
+        $this->assertEquals($expectedSql, $this->qb->getSql());
+    }
+
+    public function testGetParametersForInsert()
+    {
+        $this->qb->insert('users', ['name' => 'Jane Doe', 'age' => 30]);
+        $expectedParams = [':insert_name' => 'Jane Doe', ':insert_age' => 30];
+        $this->assertEquals($expectedParams, $this->qb->getParameters());
+    }
+
+    public function testExecuteInsert()
+    {
+        $table = 'users';
+        $data = ['username' => 'tester'];
+        $expectedSql = "INSERT INTO users (username) VALUES (:insert_username)";
+        $expectedParams = [':insert_username' => 'tester'];
+
+        $stmtMock = $this->createMock(\PDOStatement::class);
+        $this->connectionMock
+            ->expects($this->once())
+            ->method('execute')
+            ->with($expectedSql, $expectedParams)
+            ->willReturn($stmtMock);
+
+        $result = $this->qb->insert($table, $data)->execute();
+        $this->assertTrue($result, "Execute should return true on successful insert.");
+    }
+
+    public function testInsertWithEmptyDataThrowsException()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Cannot insert empty data set.");
+        $this->qb->insert('users', []);
+    }
+
+    public function testExecuteInsertHandlesPdoException()
+    {
+        $table = 'users';
+        $data = ['username' => 'tester_exception'];
+        $expectedSql = "INSERT INTO users (username) VALUES (:insert_username)";
+        $expectedParams = [':insert_username' => 'tester_exception'];
+
+        $originalPdoException = new \PDOException("Database error");
+        // Assuming Connection::execute throws QueryExecutionException, which wraps PDOException
+        // If QueryBuilder::execute catches QueryExecutionException from Connection::execute
+        // and returns false.
+        $this->connectionMock
+            ->expects($this->once())
+            ->method('execute')
+            ->with($expectedSql, $expectedParams)
+            ->willThrowException(new \YourOrm\Exception\QueryExecutionException($originalPdoException, $expectedSql, $expectedParams));
+
+        $result = $this->qb->insert($table, $data)->execute();
+        $this->assertFalse($result, "Execute should return false when connection throws PDOException/QueryExecutionException.");
+    }
+
 
     public function testUpdateQuery()
     {

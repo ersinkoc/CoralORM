@@ -7,6 +7,7 @@ namespace YourOrm;
 use PDO;
 use PDOException;
 use PDOStatement;
+use YourOrm\Exception\QueryExecutionException;
 
 /**
  * Represents a database connection.
@@ -79,8 +80,7 @@ class Connection
             $stmt->execute($params);
             return $stmt;
         } catch (PDOException $e) {
-            // Log error and re-throw
-            throw new PDOException("Query execution failed: " . $e->getMessage());
+            throw new QueryExecutionException($e, $sql, $params);
         }
     }
 
@@ -97,5 +97,35 @@ class Connection
             throw new PDOException("Not connected to the database.");
         }
         return $this->pdo->lastInsertId($name);
+    }
+
+    /**
+     * Initiates a transaction.
+     *
+     * @throws PDOException If there is already a transaction started or if the driver does not support transactions.
+     */
+    public function beginTransaction(): void
+    {
+        $this->connect()->beginTransaction();
+    }
+
+    /**
+     * Commits a transaction.
+     *
+     * @throws PDOException If there is no active transaction.
+     */
+    public function commit(): void
+    {
+        $this->connect()->commit();
+    }
+
+    /**
+     * Rolls back a transaction.
+     *
+     * @throws PDOException If there is no active transaction.
+     */
+    public function rollBack(): void
+    {
+        $this->connect()->rollBack();
     }
 }
