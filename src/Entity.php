@@ -10,8 +10,8 @@ use YourOrm\Mapping\Column;
 use YourOrm\Mapping\PrimaryKey;
 use YourOrm\Mapping\CreatedAt;
 use YourOrm\Mapping\UpdatedAt;
-use YourOrm\Mapping\BelongsTo; // Added for relationship
-// HasOne, HasMany would be added here if processing them too
+use YourOrm\Mapping\BelongsTo;
+use YourOrm\Mapping\HasMany;
 use YourOrm\Util\TypeCaster;
 use ReflectionClass;
 use ReflectionProperty;
@@ -417,6 +417,32 @@ abstract class Entity
                 // If a relation property like 'author' has none of these, it won't be in $metadata->columns, which is correct.
             }
             // TODO: Add HasOne, HasMany parsing here similarly
+
+            // HasMany
+            $hasManyAttributes = $property->getAttributes(HasMany::class);
+            if (!empty($hasManyAttributes)) {
+                $hasManyAttribute = $hasManyAttributes[0]->newInstance();
+                $relatedEntity = $hasManyAttribute->relatedEntity;
+                $foreignKey = $hasManyAttribute->foreignKey; // Column on related entity's table
+                $localKey = $hasManyAttribute->localKey;     // Column on this entity's table
+
+                if (empty($localKey)) {
+                    // Default local key is the primary key of the current entity.
+                    // This should be available as $metadata->primaryKeyColumn at this point.
+                    if (empty($metadata->primaryKeyColumn)) {
+                        throw new Exception("Cannot determine localKey for HasMany relation '{$propertyName}' on entity {$className} because the primary key for {$className} is not yet defined or found.");
+                    }
+                    $localKey = $metadata->primaryKeyColumn;
+                }
+
+                $metadata->relations[$propertyName] = [
+                    'type' => 'HasMany',
+                    'relatedEntity' => $relatedEntity,
+                    'foreignKey' => $foreignKey,
+                    'localKey' => $localKey,
+                    'propertyName' => $propertyName,
+                ];
+            }
         }
 
         self::$entityMetadataCache[$className] = $metadata;

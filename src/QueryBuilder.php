@@ -219,6 +219,16 @@ class QueryBuilder
      */
     public function getParameters(): array
     {
+        if ($this->queryType === 'INSERT') {
+            $insertParams = [];
+            foreach ($this->actionData as $key => $value) {
+                $paramName = ":insert_" . $key;
+                $insertParams[$paramName] = $value;
+            }
+            // For INSERT, parameters are built just-in-time and not merged with other types.
+            return $insertParams;
+        }
+        // For SELECT, UPDATE, DELETE, parameters are already populated by where() or by buildUpdateSql()
         return $this->parameters;
     }
 
@@ -264,44 +274,20 @@ class QueryBuilder
      *
      * @param string $table The table to insert data into.
      * @param array<string, mixed> $data An associative array of column => value pairs.
-     * @return bool True on success, false on failure.
-     * @throws PDOException If query execution fails.
+     * @return self
      * @throws \InvalidArgumentException If data is empty.
      */
-    public function insert(string $table, array $data): bool
+    public function insert(string $table, array $data): self
     {
+        if (empty($data)) {
+            throw new \InvalidArgumentException("Cannot insert empty data set.");
+        }
         $this->queryType = 'INSERT';
         $this->actionTable = $table;
         $this->actionData = $data;
-        $this->parameters = []; // Reset params for insert
+        $this->parameters = [];
         $this->paramCount = 0;
-
-
-        if (empty($this->actionData)) {
-            throw new \InvalidArgumentException("Cannot insert empty data set.");
-        }
-
-        $sql = $this->buildInsertSql();
-
-        // Prepare parameters for insertion
-        $insertParams = [];
-        foreach ($this->actionData as $key => $value) {
-            $paramName = ":insert_" . $key; // Ensure unique param names for insert
-            $insertParams[$paramName] = $value;
-        }
-        $this->parameters = $insertParams;
-
-
-        try {
-            $this->connection->execute($sql, $this->getParameters());
-            $this->reset();
-            return true;
-        } catch (PDOException $e) {
-            $this->reset();
-            // Log error or re-throw appropriately
-            error_log("Insert failed: " . $e->getMessage());
-            return false;
-        }
+        return $this;
     }
 
      /**
@@ -430,21 +416,19 @@ class QueryBuilder
      */
     public function execute(): bool
     {
-        if (!in_array($this->queryType, ['UPDATE', 'DELETE'])) {
-            throw new \LogicException("execute() can only be called for UPDATE or DELETE queries.");
+        if (!in_array($this->queryType, ['INSERT', 'UPDATE', 'DELETE'])) {
+            throw new \LogicException("execute() can only be called for INSERT, UPDATE, or DELETE queries.");
         }
 
-        $sql = $this->getSql(); // This will call buildUpdateSql or buildDeleteSql which include WHERE checks
+        $sql = $this->getSql();
+        $params = $this->getParameters(); // For INSERT, this now generates params correctly.
 
         try {
-            $stmt = $this->connection->execute($sql, $this->getParameters());
-            $success = $stmt->rowCount() > 0; // Or just true if no error, rowCount can be tricky.
-                                           // For simplicity, we'll consider it successful if execute doesn't throw.
+            $this->connection->execute($sql, $params);
             $this->reset();
-            return true; // Consider successful if no PDOException was thrown
+            return true;
         } catch (PDOException $e) {
             $this->reset();
-            // Log error or re-throw appropriately
             error_log("{$this->queryType} failed: " . $e->getMessage());
             return false;
         }

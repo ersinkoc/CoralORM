@@ -147,4 +147,92 @@ class ConnectionTest extends TestCase
         $this->expectExceptionMessage("Not connected to the database. Call connect() first.");
         $connection->execute("SELECT 1");
     }
+
+    // Helper method to create a Connection instance and inject a mock PDO object
+    private function setupConnectionAndMockPdo(): array
+    {
+        $mockPdo = $this->createMock(\PDO::class);
+        // Dummy connection parameters, not actually used if PDO is mocked properly
+        $connection = new Connection('testhost', 'testuser', 'testpass', 'testdb');
+
+        $reflection = new \ReflectionClass($connection);
+        $pdoProperty = $reflection->getProperty('pdo');
+        $pdoProperty->setAccessible(true);
+        $pdoProperty->setValue($connection, $mockPdo);
+
+        return ['connection' => $connection, 'mockPdo' => $mockPdo];
+    }
+
+    public function testBeginTransactionCallsPdoMethod()
+    {
+        $setup = $this->setupConnectionAndMockPdo();
+        $connection = $setup['connection'];
+        /** @var MockObject|PDO $mockPdo */
+        $mockPdo = $setup['mockPdo'];
+
+        $mockPdo->expects($this->once())->method('beginTransaction');
+        $connection->beginTransaction();
+    }
+
+    public function testCommitCallsPdoMethod()
+    {
+        $setup = $this->setupConnectionAndMockPdo();
+        $connection = $setup['connection'];
+        /** @var MockObject|PDO $mockPdo */
+        $mockPdo = $setup['mockPdo'];
+
+        $mockPdo->expects($this->once())->method('commit');
+        $connection->commit();
+    }
+
+    public function testRollBackCallsPdoMethod()
+    {
+        $setup = $this->setupConnectionAndMockPdo();
+        $connection = $setup['connection'];
+        /** @var MockObject|PDO $mockPdo */
+        $mockPdo = $setup['mockPdo'];
+
+        $mockPdo->expects($this->once())->method('rollBack');
+        $connection->rollBack();
+    }
+
+    public function testBeginTransactionPropagatesException()
+    {
+        $setup = $this->setupConnectionAndMockPdo();
+        $connection = $setup['connection'];
+        /** @var MockObject|PDO $mockPdo */
+        $mockPdo = $setup['mockPdo'];
+
+        $mockPdo->method('beginTransaction')->willThrowException(new \PDOException("pdo_begin_error"));
+
+        $this->expectException(\PDOException::class);
+        $this->expectExceptionMessage("pdo_begin_error");
+        $connection->beginTransaction();
+    }
+
+    public function testCommitPropagatesException()
+    {
+        $setup = $this->setupConnectionAndMockPdo();
+        $connection = $setup['connection'];
+        /** @var MockObject|PDO $mockPdo */
+        $mockPdo = $setup['mockPdo'];
+
+        $mockPdo->method('commit')->willThrowException(new \PDOException("pdo_commit_error"));
+        $this->expectException(\PDOException::class);
+        $this->expectExceptionMessage("pdo_commit_error");
+        $connection->commit();
+    }
+
+    public function testRollBackPropagatesException()
+    {
+        $setup = $this->setupConnectionAndMockPdo();
+        $connection = $setup['connection'];
+        /** @var MockObject|PDO $mockPdo */
+        $mockPdo = $setup['mockPdo'];
+
+        $mockPdo->method('rollBack')->willThrowException(new \PDOException("pdo_rollback_error"));
+        $this->expectException(\PDOException::class);
+        $this->expectExceptionMessage("pdo_rollback_error");
+        $connection->rollBack();
+    }
 }

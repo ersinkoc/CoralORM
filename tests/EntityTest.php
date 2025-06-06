@@ -13,6 +13,9 @@ use YourOrm\Mapping\PrimaryKey;
 use YourOrm\Mapping\CreatedAt;
 use YourOrm\Mapping\UpdatedAt;
 use DateTimeImmutable;
+use Tests\YourOrm\TestEntities\UserWithHasMany;
+use Tests\YourOrm\TestEntities\PostWithBelongsTo;
+use Tests\YourOrm\TestEntities\UserWithHasManyDefaultLocalKey;
 
 // Attribute-based Test Entity
 #[Table(name: 'test_entities')]
@@ -54,6 +57,15 @@ class TestAttributeEntity extends Entity // YourOrm\Entity
 
 class EntityTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Clear the static cache in Entity class before each test
+        $entityMetadataCacheReflector = new \ReflectionProperty(\YourOrm\Entity::class, 'entityMetadataCache');
+        $entityMetadataCacheReflector->setAccessible(true);
+        $entityMetadataCacheReflector->setValue(null, []);
+    }
+
     // Test metadata parsing
     public function testMetadataParsing()
     {
@@ -313,5 +325,36 @@ class EntityTest extends TestCase
         $entity->name = 'First Set'; // Set back to the value now in $this->data for 'name'
         $this->assertFalse($entity->isDirty(), "Entity should not be dirty if property is set back to its now pristine value.");
         $this->assertEmpty($entity->getDirtyProperties(), "Dirty properties should be empty.");
+    }
+
+    public function testHasManyRelationshipMetadata()
+    {
+        $metadata = UserWithHasMany::getMetadata();
+
+        $this->assertArrayHasKey('posts', $metadata->relations, "Relations metadata should include 'posts'.");
+        $relation = $metadata->relations['posts'];
+
+        $this->assertEquals('HasMany', $relation['type']);
+        $this->assertEquals(PostWithBelongsTo::class, $relation['relatedEntity']);
+        $this->assertEquals('user_id', $relation['foreignKey']); // Column on PostWithBelongsTo table
+        $this->assertEquals('id', $relation['localKey']);       // Column on UserWithHasMany table (its PK)
+        $this->assertEquals('posts', $relation['propertyName']);
+    }
+
+    public function testHasManyRelationshipMetadataDefaultsLocalKey()
+    {
+        // UserWithHasManyDefaultLocalKey has #[Column(name: 'custom_id')] for its 'id' property.
+        $metadata = UserWithHasManyDefaultLocalKey::getMetadata();
+
+        $this->assertArrayHasKey('postsDefaultKey', $metadata->relations, "Relations metadata should include 'postsDefaultKey'.");
+        $relation = $metadata->relations['postsDefaultKey'];
+
+        $this->assertEquals('HasMany', $relation['type']);
+        $this->assertEquals(PostWithBelongsTo::class, $relation['relatedEntity']);
+        $this->assertEquals('user_id', $relation['foreignKey']); // Column on PostWithBelongsTo table
+
+        // Assert that localKey defaults to the *column name* of the primary key of UserWithHasManyDefaultLocalKey
+        $this->assertEquals('custom_id', $relation['localKey'], "LocalKey should default to the PK column name 'custom_id'.");
+        $this->assertEquals('postsDefaultKey', $relation['propertyName']);
     }
 }
