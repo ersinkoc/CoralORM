@@ -7,7 +7,7 @@ namespace Examples;
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/02-define-entity.php'; // To ensure User entity class is loaded
 
-use App\Repository;
+use YourOrm\Repository;
 use Examples\Entity\User;
 
 echo PHP_EOL . "--- Example 06: Deleting Records ---" . PHP_EOL;

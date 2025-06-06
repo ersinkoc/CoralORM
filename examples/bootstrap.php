@@ -9,7 +9,7 @@ if (!file_exists($autoloaderPath)) {
 }
 require_once $autoloaderPath;
 
-use App\Connection;
+use YourOrm\Connection;
 
 // --- Database Configuration ---
 $configPath = __DIR__ . '/config.php';

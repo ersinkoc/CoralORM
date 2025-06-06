@@ -6,7 +6,7 @@ namespace Examples;
 
 require_once __DIR__ . '/bootstrap.php';
 
-use App\Connection; // Assuming Connection is in App namespace
+use YourOrm\Connection;
 
 echo PHP_EOL . "--- Example 01: Connecting to the Database ---" . PHP_EOL;
 

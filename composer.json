@@ -15,7 +15,7 @@
     "autoload": {
         "psr-4": {
             "YourOrm\\": "src/",
-            "YourOrm\\Migration\\Database\\": "migrations/"
+            "YourOrm\\Migration\\Database\\": "src/Migration/Database/"
         }
     },
     "autoload-dev": {
