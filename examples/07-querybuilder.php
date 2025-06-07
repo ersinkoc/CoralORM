@@ -8,7 +8,7 @@ require_once __DIR__ . '/bootstrap.php';
 // No need to load 02-define-entity.php if we are not using specific Entity classes here,
 // but QueryBuilder can be used to fetch data that could be hydrated into entities.
 
-use YourOrm\QueryBuilder;
+use CoralORM\QueryBuilder;
 
 echo PHP_EOL . "--- Example 07: Using QueryBuilder Directly ---" . PHP_EOL;
 

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace YourOrm;
+namespace CoralORM;
 
 use PDO;
 use PDOException;
 use PDOStatement;
-use YourOrm\Exception\QueryExecutionException;
+use CoralORM\Exception\QueryExecutionException;
 
 /**
  * Represents a database connection.

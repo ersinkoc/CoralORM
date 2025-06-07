@@ -1,5 +1,5 @@
 {
-    "name": "php-orm/php-orm",
+    "name": "coralorm/coralorm",
     "description": "A simple PHP ORM",
     "type": "library",
     "license": "MIT",
@@ -14,13 +14,13 @@
     },
     "autoload": {
         "psr-4": {
-            "YourOrm\\": "src/",
-            "YourOrm\\Migration\\Database\\": "src/Migration/Database/"
+            "CoralORM\\": "src/",
+            "CoralORM\\Migration\\Database\\": "src/Migration/Database/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\YourOrm\\": "tests/"
+            "Tests\\CoralORM\\": "tests/"
         }
     }
 }

@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-namespace YourOrm;
+namespace CoralORM;
 
 use PDOException;
-use YourOrm\Mapping\EntityMetadata;
-use YourOrm\Entity; // Ensure base Entity is imported for type hinting
+use CoralORM\Mapping\EntityMetadata;
+use CoralORM\Entity; // Ensure base Entity is imported for type hinting
+use CoralORM\QueryBuilder;
+use CoralORM\Util\TypeCaster;
 
 /**
  * Manages persistence for entities.

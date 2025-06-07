@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-namespace YourOrm\Mapping;
+namespace CoralORM\Mapping;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_CLASS)]

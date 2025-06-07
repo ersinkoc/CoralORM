@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace YourOrm;
+namespace CoralORM;
 
-use YourOrm\Mapping\EntityMetadata;
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\CreatedAt;
-use YourOrm\Mapping\UpdatedAt;
-use YourOrm\Mapping\BelongsTo;
-use YourOrm\Mapping\HasMany;
-use YourOrm\Util\TypeCaster;
+use CoralORM\Mapping\EntityMetadata;
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\CreatedAt;
+use CoralORM\Mapping\UpdatedAt;
+use CoralORM\Mapping\BelongsTo;
+use CoralORM\Mapping\HasMany;
+use CoralORM\Util\TypeCaster;
 use ReflectionClass;
 use ReflectionProperty;
 use DateTimeImmutable;

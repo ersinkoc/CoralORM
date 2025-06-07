@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace YourOrm\Util;
+namespace CoralORM\Util;
 
 use DateTimeImmutable;
 use DateTimeInterface;

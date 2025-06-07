@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace YourOrm\Migration;
+namespace CoralORM\Migration;
 
-use YourOrm\Connection;
-use YourOrm\QueryBuilder; // For interacting with migrations table
+use CoralORM\Connection;
+use CoralORM\QueryBuilder; // For interacting with migrations table
 use PDOException;
 use FilesystemIterator;
 use DateTime;
@@ -17,7 +17,7 @@ class Migrator
     protected string $migrationsTable = 'migrations'; // Default table name
     // Define a namespace where migration classes are expected to be found.
     // This should match the namespace used in generated migration files.
-    protected string $migrationNamespace = 'YourOrm\\Migration\\Database\\';
+    protected string $migrationNamespace = 'CoralORM\\Migration\\Database\\';
 
     public function __construct(Connection $connection, string $migrationsPath)
     {
@@ -41,8 +41,8 @@ class Migrator
             // This error check is basic. A more specific error code check (e.g., '42S02' for table not found)
             // would be more robust than catching any PDOException.
             echo "Migrations table '{$this->migrationsTable}' not found, creating it." . PHP_EOL;
-            $schemaBuilder = new SchemaBuilder($this->connection);
-            $schemaBuilder->createTable($this->migrationsTable, function(SchemaBuilder $table) {
+            $schemaBuilder = new \CoralORM\Migration\SchemaBuilder($this->connection);
+            $schemaBuilder->createTable($this->migrationsTable, function(\CoralORM\Migration\SchemaBuilder $table) {
                 $table->id(); // Standard auto-incrementing PK 'id'
                 $table->string('migration')->unique(); // Migration file name (without .php)
                 $table->integer('batch');
@@ -165,7 +165,7 @@ class Migrator
             return false;
         }
 
-        $schemaBuilder = new SchemaBuilder($this->connection);
+        $schemaBuilder = new \CoralORM\Migration\SchemaBuilder($this->connection);
         try {
             echo "Running up: {$migrationName}" . PHP_EOL;
             $migrationInstance->up($schemaBuilder);
@@ -202,7 +202,7 @@ class Migrator
             return false;
         }
 
-        $schemaBuilder = new SchemaBuilder($this->connection);
+        $schemaBuilder = new \CoralORM\Migration\SchemaBuilder($this->connection);
         try {
             echo "Running down: {$migrationName}" . PHP_EOL;
             $migrationInstance->down($schemaBuilder);

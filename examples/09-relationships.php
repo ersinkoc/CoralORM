@@ -6,21 +6,22 @@ require_once __DIR__ . '/bootstrap.php';
 
 namespace Examples\Relationships;
 
-use YourOrm\Entity;
-use YourOrm\Repository;
-use YourOrm\Connection; // Only if directly used, Repository handles connection
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\BelongsTo;
-use YourOrm\Mapping\HasOne;
-use YourOrm\Mapping\HasMany;
-use YourOrm\Mapping\ManyToMany;
-use YourOrm\Mapping\CreatedAt;
-use YourOrm\Mapping\UpdatedAt;
+use CoralORM\Entity;
+use CoralORM\Repository;
+use CoralORM\Connection; // Only if directly used, Repository handles connection
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\BelongsTo;
+use CoralORM\Mapping\HasOne;
+use CoralORM\Mapping\HasMany;
+use CoralORM\Mapping\ManyToMany;
+use CoralORM\Mapping\CreatedAt;
+use CoralORM\Mapping\UpdatedAt;
+use CoralORM\QueryBuilder; // Added for direct instantiation
 use DateTimeImmutable;
 
-echo PHP_EOL . "--- Example 09: Relationships with YourOrm ---" . PHP_EOL;
+echo PHP_EOL . "--- Example 09: Relationships with CoralORM ---" . PHP_EOL;
 
 // --- Entity Definitions ---
 
@@ -240,12 +241,12 @@ try {
         } else {
             echo " - Created Tags (IDs: {$tagElec->id}, {$tagWear->id}, {$tagGadg->id}) and Products (IDs: {$product1->id}, {$product2->id}).\n";
             // To link them for ManyToMany, we need to interact with the join table.
-            // YourOrm\Repository doesn't have direct methods for ManyToMany link/unlink.
+            // CoralORM\Repository doesn't have direct methods for ManyToMany link/unlink.
             // This typically requires raw SQL via QueryBuilder or a dedicated service.
             // Let's simulate by adding records to 'product_tag' table if schema permits.
             // This is a simplification. A real ORM would handle this more gracefully.
 
-            $qb = new \YourOrm\QueryBuilder($connection); // Use fully qualified if not imported at top of namespace
+            $qb = new QueryBuilder($connection); // Use CoralORM\QueryBuilder (added use statement)
             try {
                 // Link product1 with all three tags
                 $qb->insert('product_tag', ['product_id' => $product1->id, 'tag_id' => $tagElec->id]);

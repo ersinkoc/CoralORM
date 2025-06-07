@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Tests\YourOrm;
+namespace Tests\CoralORM;
 
-use YourOrm\Entity;
+use CoralORM\Entity;
 use PHPUnit\Framework\TestCase;
 
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\CreatedAt;
-use YourOrm\Mapping\UpdatedAt;
-use YourOrm\Mapping\NotNull;
-use YourOrm\Mapping\Length;
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\CreatedAt;
+use CoralORM\Mapping\UpdatedAt;
+use CoralORM\Mapping\NotNull;
+use CoralORM\Mapping\Length;
 use DateTimeImmutable;
-use Tests\YourOrm\TestEntities\UserWithHasMany;
-use Tests\YourOrm\TestEntities\PostWithBelongsTo;
-use Tests\YourOrm\TestEntities\UserWithHasManyDefaultLocalKey;
+use Tests\CoralORM\TestEntities\UserWithHasMany;
+use Tests\CoralORM\TestEntities\PostWithBelongsTo;
+use Tests\CoralORM\TestEntities\UserWithHasManyDefaultLocalKey;
 
 // Attribute-based Test Entity
 #[Table(name: 'test_entities')]
-class TestAttributeEntity extends Entity // YourOrm\Entity
+class TestAttributeEntity extends Entity // CoralORM\Entity
 {
     #[PrimaryKey]
     #[Column(name: 'entity_id', type: 'int')]
@@ -72,7 +72,7 @@ class EntityTest extends TestCase
     {
         parent::setUp();
         // Clear the static cache in Entity class before each test
-        $entityMetadataCacheReflector = new \ReflectionProperty(\YourOrm\Entity::class, 'entityMetadataCache');
+        $entityMetadataCacheReflector = new \ReflectionProperty(\CoralORM\Entity::class, 'entityMetadataCache');
         $entityMetadataCacheReflector->setAccessible(true);
         $entityMetadataCacheReflector->setValue(null, []);
     }

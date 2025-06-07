@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace YourOrm\Migration\Database; // Critical namespace
+namespace CoralORM\Migration\Database; // Critical namespace
 
-use YourOrm\Migration\AbstractMigration;
-use YourOrm\Migration\SchemaBuilder;
+use CoralORM\Migration\AbstractMigration;
+use CoralORM\Migration\SchemaBuilder;
 
 /**
  * Example migration to create an 'example_items' table.

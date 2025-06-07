@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-// ORM CLI - Command Line Interface for YourOrm
+// ORM CLI - Command Line Interface for CoralORM
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-use YourOrm\Connection;
-use YourOrm\Migration\Migrator;
-use YourOrm\Migration\SchemaBuilder; // For migrate:make template
+use CoralORM\Connection;
+use CoralORM\Migration\Migrator;
+use CoralORM\Migration\SchemaBuilder; // For migrate:make template
 
 // --- Configuration ---
 $configPath = __DIR__ . '/config/database.php';
@@ -21,7 +21,7 @@ $dbConfig = require $configPath;
 // Resolve migrations path relative to project root (where orm-cli.php is)
 $projectRoot = __DIR__;
 $migrationsPath = $projectRoot . '/' . trim($dbConfig['migrations_path'], '/');
-$migrationsNamespace = $dbConfig['migrations_namespace'] ?? 'YourOrm\\Migration\\Database\\';
+$migrationsNamespace = $dbConfig['migrations_namespace'] ?? 'CoralORM\\Migration\\Database\\';
 
 
 // --- Argument Parsing ---
@@ -58,9 +58,9 @@ $migrator = new Migrator($connection, $migrationsPath);
 // Adjust Migrator's expected namespace if it differs from its internal default
 // This assumes Migrator has a way to set/override its default migration namespace,
 // or that its default ($this->migrationNamespace) matches what's in config.
-// For now, Migrator.php was hardcoded with 'YourOrm\\Migration\\Database\\'.
-// If $dbConfig['migrations_namespace'] is different, Migrator would need a setter or constructor param.
-// Let's assume they match as per current Migrator.php.
+// Migrator.php's internal default has been updated to 'CoralORM\\Migration\\Database\\'.
+// If $dbConfig['migrations_namespace'] is different, Migrator would need a setter or constructor param for override.
+// Let's assume they match.
 
 
 // --- Command Handling ---
@@ -81,8 +81,8 @@ exit(0); // Success
 
 function display_help(): void
 {
-    echo "YourOrm CLI Help" . PHP_EOL;
-    echo "----------------" . PHP_EOL;
+    echo "CoralORM CLI Help" . PHP_EOL;
+    echo "-----------------" . PHP_EOL;
     echo "Usage: php orm-cli.php <command> [options]" . PHP_EOL . PHP_EOL;
     echo "Available commands:" . PHP_EOL;
     echo "  migrate:make <MigrationName>    Creates a new migration file (e.g., CreateUsersTable)." . PHP_EOL;
@@ -185,9 +185,9 @@ declare(strict_types=1);
 
 namespace {$namespace};
 
-use YourOrm\Migration\AbstractMigration;
-use YourOrm\Migration\SchemaBuilder;
-use YourOrm\Connection; // For postUp type hinting
+use CoralORM\Migration\AbstractMigration;
+use CoralORM\Migration\SchemaBuilder;
+use CoralORM\Connection; // For postUp type hinting
 
 class {$className} extends AbstractMigration
 {
@@ -253,7 +253,7 @@ class {$className} extends AbstractMigration
      * public function postUp(Connection \$connection): void
      * {
      *     // Example: Seed initial data using QueryBuilder
-     *     // \$qb = new \YourOrm\QueryBuilder(\$connection);
+     *     // \$qb = new \CoralORM\QueryBuilder(\$connection);
      *     // \$qb->insert('{$migrationName_lowercase}', [
      *     //    ['name' => 'Default Item 1', 'description' => 'First item created via postUp'],
      *     //    ['name' => 'Default Item 2', 'description' => 'Second item via postUp']

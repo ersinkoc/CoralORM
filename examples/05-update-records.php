@@ -7,7 +7,7 @@ namespace Examples;
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/02-define-entity.php'; // To ensure User entity class is loaded
 
-use YourOrm\Repository;
+use CoralORM\Repository;
 use Examples\Entity\User;
 
 echo PHP_EOL . "--- Example 05: Updating Records ---" . PHP_EOL;

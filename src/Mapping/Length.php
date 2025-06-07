@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace YourOrm\Mapping;
+namespace CoralORM\Mapping;
 
 use Attribute;
 use InvalidArgumentException;
