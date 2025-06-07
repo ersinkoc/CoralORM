@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace YourOrm\Migration;
+namespace CoralORM\Migration;
 
-use YourOrm\Connection;
+use CoralORM\Connection;
 
 /**
  * Base class for database migrations.

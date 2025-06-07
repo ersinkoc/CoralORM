@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\YourOrm\TestEntities;
+namespace Tests\CoralORM\TestEntities;
 
-use YourOrm\Entity;
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\HasMany;
+use CoralORM\Entity;
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\HasMany;
 
 #[Table('users')]
 class UserWithHasMany extends Entity

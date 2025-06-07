@@ -7,7 +7,7 @@ namespace Examples;
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/02-define-entity.php'; // To ensure User and Post entity classes are loaded
 
-use YourOrm\Repository;
+use CoralORM\Repository;
 use Examples\Entity\User;
 use Examples\Entity\Post;
 

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\YourOrm\Util;
+namespace Tests\CoralORM\Util;
 
-use YourOrm\Util\TypeCaster;
+use CoralORM\Util\TypeCaster;
 use PHPUnit\Framework\TestCase;
 use DateTimeImmutable;
 

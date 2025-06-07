@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\YourOrm\Migration;
+namespace Tests\CoralORM\Migration;
 
-use YourOrm\Connection;
-use YourOrm\Migration\SchemaBuilder;
+use CoralORM\Connection;
+use CoralORM\Migration\SchemaBuilder;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 
@@ -16,8 +16,8 @@ class SchemaBuilderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connectionMock = $this->createMock(Connection::class);
-        $this->schemaBuilder = new SchemaBuilder($this->connectionMock);
+        $this->connectionMock = $this->createMock(\CoralORM\Connection::class);
+        $this->schemaBuilder = new \CoralORM\Migration\SchemaBuilder($this->connectionMock);
     }
 
     public function testCreateTableBasic()

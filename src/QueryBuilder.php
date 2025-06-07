@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace YourOrm;
+namespace CoralORM;
 
 use PDO;
 use PDOException;

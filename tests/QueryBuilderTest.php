@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Tests\YourOrm;
+namespace Tests\CoralORM;
 
 // Corrected use statements
-use YourOrm\Connection;
-use YourOrm\QueryBuilder;
+use CoralORM\Connection;
+use CoralORM\QueryBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use PDOStatement; // For mocking execute if we go that far
 use PDO;          // For PDO constants like PDO::FETCH_ASSOC
+use CoralORM\Exception\QueryExecutionException;
 
 class QueryBuilderTest extends TestCase
 {
@@ -19,8 +20,8 @@ class QueryBuilderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connectionMock = $this->createMock(\YourOrm\Connection::class);
-        $this->qb = new \YourOrm\QueryBuilder($this->connectionMock);
+        $this->connectionMock = $this->createMock(\CoralORM\Connection::class);
+        $this->qb = new \CoralORM\QueryBuilder($this->connectionMock);
     }
 
     public function testSelectQuery()
@@ -246,7 +247,7 @@ class QueryBuilderTest extends TestCase
             ->expects($this->once())
             ->method('execute')
             ->with($expectedSql, $expectedParams)
-            ->willThrowException(new \YourOrm\Exception\QueryExecutionException($originalPdoException, $expectedSql, $expectedParams));
+            ->willThrowException(new QueryExecutionException($originalPdoException, $expectedSql, $expectedParams));
 
         $result = $this->qb->insert($table, $data)->execute();
         $this->assertFalse($result, "Execute should return false when connection throws PDOException/QueryExecutionException.");

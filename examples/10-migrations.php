@@ -6,10 +6,10 @@ require_once __DIR__ . '/bootstrap.php';
 
 namespace Examples\MigrationsDemo;
 
-use YourOrm\Connection;
-use YourOrm\Migration\Migrator;
+use CoralORM\Connection;
+use CoralORM\Migration\Migrator;
 
-echo PHP_EOL . "--- Example 10: Running Migrations with YourOrm ---" . PHP_EOL;
+echo PHP_EOL . "--- Example 10: Running Migrations with CoralORM ---" . PHP_EOL;
 
 $connection = get_db_connection();
 
@@ -19,7 +19,7 @@ if (!$connection) {
 }
 
 // The Migrator expects migration files to be in a specific path and namespace.
-// As per YourOrm\Migration\Migrator, the namespace is 'YourOrm\Migration\Database\'
+// As per CoralORM\Migration\Migrator, the namespace is 'CoralORM\Migration\Database\'
 // And the path is passed to its constructor.
 // We created '20240315000000_CreateExampleItemsTable.php' in 'src/Migration/Database/'
 $migrationsPath = __DIR__ . '/../src/Migration/Database'; // Relative path to the migration files

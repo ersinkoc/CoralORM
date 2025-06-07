@@ -1,27 +1,27 @@
-# YourOrm - A PHP ORM
+# CoralORM - A PHP ORM
 
-A simple and lightweight Object-Relational Mapper (ORM) for PHP, refactored to use the `YourOrm` namespace.
+A simple and lightweight Object-Relational Mapper (ORM) for PHP, refactored to use the `CoralORM` namespace.
 
 ## Features
 
-*   **Entities**: Represent database tables as PHP objects (`YourOrm\Entity`).
-*   **Repositories**: Provide a way to interact with entities and perform database operations (`YourOrm\Repository`).
-*   **Query Builder**: A fluent interface for building complex SQL queries (`YourOrm\QueryBuilder`).
-*   **Migrations**: Manage database schema changes over time (`YourOrm\Migration\Migrator`, `YourOrm\Migration\AbstractMigration`).
+*   **Entities**: Represent database tables as PHP objects (`CoralORM\Entity`).
+*   **Repositories**: Provide a way to interact with entities and perform database operations (`CoralORM\Repository`).
+*   **Query Builder**: A fluent interface for building complex SQL queries (`CoralORM\QueryBuilder`).
+*   **Migrations**: Manage database schema changes over time (`CoralORM\Migration\Migrator`, `CoralORM\Migration\AbstractMigration`).
 
 ## Installation
 
 This project is primarily a standalone library.
 
 **For users integrating the ORM into their own project:**
-You would typically copy the ORM's `src` directory into your project (e.g., into `lib/your-orm/src/`) and configure your project's `composer.json` to autoload the `YourOrm` namespace.
+You would typically copy the ORM's `src` directory into your project (e.g., into `lib/coral-orm/src/`) and configure your project's `composer.json` to autoload the `CoralORM` namespace.
 
 Example `composer.json` snippet for your project:
 ```json
 {
     "autoload": {
         "psr-4": {
-            "YourOrm\\": "lib/your-orm/src/"
+            "CoralORM\\": "lib/coral-orm/src/"
         }
     }
 }
@@ -29,7 +29,7 @@ Example `composer.json` snippet for your project:
 Then run `composer dump-autoload` in your project.
 
 **For developers working on the ORM itself:**
-Running `composer install` in the ORM project root is sufficient to set up autoloading for `src/` (as `YourOrm\\`) and `tests/` (as `Tests\\YourOrm\\`) based on the existing `composer.json` in this repository.
+Running `composer install` in the ORM project root is sufficient to set up autoloading for `src/` (as `CoralORM\\`) and `tests/` (as `Tests\\CoralORM\\`) based on the existing `composer.json` in this repository.
 
 ## Configuration
 
@@ -46,9 +46,9 @@ Database connection parameters are required to use the ORM.
     *   `db_pass`: Database password.
 
 3.  **Instantiating Connection:**
-    You can instantiate `YourOrm\Connection` directly:
+    You can instantiate `CoralORM\Connection` directly:
     ```php
-    use YourOrm\Connection;
+    use CoralORM\Connection;
 
     $connection = new Connection('localhost', 'my_user', 'my_password', 'my_database');
     ```
@@ -56,21 +56,21 @@ Database connection parameters are required to use the ORM.
 
 ## Core Concepts
 
-### Entity (`YourOrm\Entity`)
-Entities are PHP objects that represent rows in your database tables. You define an entity by creating a class that extends `YourOrm\Entity`. Database table and column mapping is typically done using attributes from the `YourOrm\Mapping` namespace (e.g., `#[Table]`, `#[Column]`, `#[PrimaryKey]`).
+### Entity (`CoralORM\Entity`)
+Entities are PHP objects that represent rows in your database tables. You define an entity by creating a class that extends `CoralORM\Entity`. Database table and column mapping is typically done using attributes from the `CoralORM\Mapping` namespace (e.g., `#[Table]`, `#[Column]`, `#[PrimaryKey]`).
 
-### Repository (`YourOrm\Repository`)
+### Repository (`CoralORM\Repository`)
 Repositories are responsible for finding and persisting entities. Each entity typically has its own repository. You instantiate a repository with a `Connection` object and the fully qualified class name of the entity it manages (e.g., `new Repository($connection, User::class)`). It provides methods like `find()`, `findAll()`, `findBy()`, `save()`, and `delete()`.
 
-### QueryBuilder (`YourOrm\QueryBuilder`)
+### QueryBuilder (`CoralORM\QueryBuilder`)
 For queries more complex than what the Repository offers, the `QueryBuilder` provides a fluent programmatic interface to construct SQL queries. You instantiate it with a `Connection` object (e.g., `new QueryBuilder($connection)`). It allows you to build detailed SELECT, INSERT, UPDATE, and DELETE statements.
 
-### Migrations (`YourOrm\Migration\AbstractMigration`, `YourOrm\Migration\Migrator`)
-Migrations help manage incremental and reversible changes to your database schema. You create migration classes by extending `YourOrm\Migration\AbstractMigration` and define `up()` and `down()` methods using `YourOrm\Migration\SchemaBuilder`. The `YourOrm\Migration\Migrator` service, typically used via `orm-cli.php`, is used to apply or roll back migrations.
+### Migrations (`CoralORM\Migration\AbstractMigration`, `CoralORM\Migration\Migrator`)
+Migrations help manage incremental and reversible changes to your database schema. You create migration classes by extending `CoralORM\Migration\AbstractMigration` and define `up()` and `down()` methods using `CoralORM\Migration\SchemaBuilder`. The `CoralORM\Migration\Migrator` service, typically used via `orm-cli.php`, is used to apply or roll back migrations.
 
 ## Defining Entities
 
-Entities are the cornerstone of YourOrm, representing the structure of your database tables as PHP objects. They extend the base `YourOrm\Entity` class, and their mapping to the database is defined using attributes from the `YourOrm\Mapping` namespace.
+Entities are the cornerstone of CoralORM, representing the structure of your database tables as PHP objects. They extend the base `CoralORM\Entity` class, and their mapping to the database is defined using attributes from the `CoralORM\Mapping` namespace.
 
 ### Table Name (`#[Table]`)
 The `#[Table]` attribute specifies the database table name for an entity.
@@ -78,10 +78,10 @@ The `#[Table]` attribute specifies the database table name for an entity.
 *   **Usage:** `#[Table(name: 'your_table_name')]`
 *   **Example:**
     ```php
-    use YourOrm\Mapping\Table;
+    use CoralORM\Mapping\Table;
 
     #[Table(name: 'app_users')]
-    class User extends YourOrm\Entity
+    class User extends CoralORM\Entity
     {
         // ...
     }
@@ -102,7 +102,7 @@ The `#[Column]` attribute maps an entity property to a database table column.
         *   `'array'` (for columns storing JSON data)
 *   **Examples:**
     ```php
-    use YourOrm\Mapping\Column;
+    use CoralORM\Mapping\Column;
     use DateTimeImmutable;
 
     // ...
@@ -126,8 +126,8 @@ The `#[PrimaryKey]` attribute marks a property as the primary key for the entity
     *   `autoIncrement` (bool, optional): Specifies if the primary key is auto-incrementing. Defaults to `true`.
 *   **Example:**
     ```php
-    use YourOrm\Mapping\PrimaryKey;
-    use YourOrm\Mapping\Column;
+    use CoralORM\Mapping\PrimaryKey;
+    use CoralORM\Mapping\Column;
 
     // ...
     #[PrimaryKey] // autoIncrement defaults to true
@@ -146,9 +146,9 @@ These attributes automatically manage timestamping for entity creation and updat
 *   **Type Recommendation:** It's recommended to type these properties as `?DateTimeImmutable`. The ORM will automatically handle the conversion.
 *   **Example:**
     ```php
-    use YourOrm\Mapping\CreatedAt;
-    use YourOrm\Mapping\UpdatedAt;
-    use YourOrm\Mapping\Column;
+    use CoralORM\Mapping\CreatedAt;
+    use CoralORM\Mapping\UpdatedAt;
+    use CoralORM\Mapping\Column;
     use DateTimeImmutable;
 
     // ...
@@ -166,8 +166,8 @@ These attributes define basic validation constraints that can be checked before 
 
 *   **`#[NotNull]`**: Marks a property as non-nullable. The ORM may check this before saving.
     ```php
-    use YourOrm\Mapping\NotNull;
-    use YourOrm\Mapping\Column;
+    use CoralORM\Mapping\NotNull;
+    use CoralORM\Mapping\Column;
 
     // ...
     #[NotNull]
@@ -178,8 +178,8 @@ These attributes define basic validation constraints that can be checked before 
 
 *   **`#[Length(min: ?int, max: ?int)]`**: Specifies the minimum and/or maximum length for a string property.
     ```php
-    use YourOrm\Mapping\Length;
-    use YourOrm\Mapping\Column;
+    use CoralORM\Mapping\Length;
+    use CoralORM\Mapping\Column;
 
     // ...
     #[Length(max: 255)]
@@ -197,14 +197,14 @@ Here's an example of a `User` entity showcasing various attributes:
 ```php
 namespace App\Entity; // Example namespace for your project
 
-use YourOrm\Entity;
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\CreatedAt;
-use YourOrm\Mapping\UpdatedAt;
-use YourOrm\Mapping\NotNull;
-use YourOrm\Mapping\Length;
+use CoralORM\Entity;
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\CreatedAt;
+use CoralORM\Mapping\UpdatedAt;
+use CoralORM\Mapping\NotNull;
+use CoralORM\Mapping\Length;
 use DateTimeImmutable;
 
 #[Table(name: 'app_users')]
@@ -242,12 +242,12 @@ class User extends Entity
 ```
 
 ### Property Access and Type Casting
-The base `YourOrm\Entity` class uses magic `__get` and `__set` methods. When you set a property that's mapped with `#[Column(type: 'some_type')]`, the `__set` method attempts to cast the value to the specified PHP type. Similarly, `__get` ensures data is returned as the correct type.
+The base `CoralORM\Entity` class uses magic `__get` and `__set` methods. When you set a property that's mapped with `#[Column(type: 'some_type')]`, the `__set` method attempts to cast the value to the specified PHP type. Similarly, `__get` ensures data is returned as the correct type.
 
 While magic methods provide this convenience, you are free to define explicit public properties and traditional getter/setter methods in your entity classes if you prefer more direct control or need custom logic.
 
 ### Naming Conventions
-YourOrm follows common conventions but allows overrides via attributes:
+CoralORM follows common conventions but allows overrides via attributes:
 
 *   **Table Names:** If `#[Table(name: '...')]` is not specified, the default table name is derived from the entity's class name, converted to snake_case, and pluralized (e.g., `UserRole` becomes `user_roles`, `Product` becomes `products`).
 *   **Column Names:** If `#[Column(name: '...')]` is not specified for a mapped property, the default column name is the property name converted to snake_case (e.g., `firstName` becomes `first_name`).
@@ -262,22 +262,22 @@ Here's a simple example of how to use the ORM:
 <?php
 
 // Ensure this path is correct for your project structure
-// and that YourOrm classes are autoloadable.
+// and that CoralORM classes are autoloadable.
 require_once 'vendor/autoload.php';
 
 // For direct usage:
-use YourOrm\Connection;
-use YourOrm\Repository;
+use CoralORM\Connection;
+use CoralORM\Repository;
 
 // Define your entity (or ensure it's autoloaded)
 // This example defines it inline for brevity.
 namespace MyProject\Entity; // Choose your own project namespace
 
-use YourOrm\Entity;
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\CreatedAt;
+use CoralORM\Entity;
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\CreatedAt;
 use DateTimeImmutable; // Remember to import DateTimeImmutable
 
 #[Table(name: 'users')]

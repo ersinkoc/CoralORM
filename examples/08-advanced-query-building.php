@@ -6,19 +6,19 @@ require_once __DIR__ . '/bootstrap.php'; // Corrected bootstrap path
 
 namespace Examples\AdvQuery; // Using a distinct namespace for these example entities
 
-use YourOrm\Connection;
-use YourOrm\Entity;
-use YourOrm\Repository;
-use YourOrm\QueryBuilder;
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\HasMany;
-use YourOrm\Mapping\BelongsTo;
-use YourOrm\Mapping\CreatedAt;
+use CoralORM\Connection;
+use CoralORM\Entity;
+use CoralORM\Repository;
+use CoralORM\QueryBuilder;
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\HasMany;
+use CoralORM\Mapping\BelongsTo;
+use CoralORM\Mapping\CreatedAt;
 use DateTimeImmutable;
 
-echo PHP_EOL . "--- Example 08: Advanced Query Building with YourOrm ---" . PHP_EOL;
+echo PHP_EOL . "--- Example 08: Advanced Query Building with CoralORM ---" . PHP_EOL;
 
 // --- Entity Definitions ---
 
@@ -88,8 +88,8 @@ if (!$connection) {
     exit(1);
 }
 
-// Note: YourOrm\Repository is simpler and does not have createQueryBuilder method.
-// We will use YourOrm\QueryBuilder directly.
+// Note: CoralORM\Repository is simpler and does not have createQueryBuilder method.
+// We will use CoralORM\QueryBuilder directly.
 
 try {
     $userRepository = new Repository($connection, User::class); // For potential direct repo use
@@ -233,7 +233,7 @@ try {
     echo "9. Query with multiple conditions (WHERE AND/OR):\n";
     $qb9 = new QueryBuilder($connection);
     // Example: Find users named 'Jane Doe' OR users with email ending in '@example.com'
-    // YourOrm\QueryBuilder chains WHERE clauses with AND by default.
+    // CoralORM\QueryBuilder chains WHERE clauses with AND by default.
     // For OR, you need to construct the condition string manually or use a more advanced QueryBuilder.
     // The current QueryBuilder might not support complex OR conditions directly in a fluent way
     // without raw SQL in where().
@@ -270,7 +270,7 @@ try {
 
 
 echo "---------------------------------\n";
-echo "Advanced query examples complete with YourOrm.\n";
+echo "Advanced query examples complete with CoralORM.\n";
 echo "Please ensure you have appropriate tables (users, orders), and sample data.\n";
 echo "The 'users' table needs 'id', 'name', 'email', 'created_at'.\n";
 echo "The 'orders' table needs 'id', 'user_id', 'amount', 'created_at'.\n";

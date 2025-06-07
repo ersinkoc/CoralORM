@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Tests\YourOrm;
+namespace Tests\CoralORM;
 
-use YourOrm\Connection;
-use YourOrm\Entity;
+use CoralORM\Connection;
+use CoralORM\Entity;
 // QueryBuilder is used by Repository, not directly in most Repository tests if Connection is mocked
-// use YourOrm\QueryBuilder;
-use YourOrm\Repository;
+// use CoralORM\QueryBuilder;
+use CoralORM\Repository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use PDOStatement;
-use YourOrm\Mapping\Table;
-use YourOrm\Mapping\Column;
-use YourOrm\Mapping\PrimaryKey;
-use YourOrm\Mapping\CreatedAt;
-use YourOrm\Mapping\UpdatedAt;
-use YourOrm\Mapping\BelongsTo;
-use YourOrm\Mapping\ManyToMany; // For ManyToMany relationship tests
+use CoralORM\Mapping\Table;
+use CoralORM\Mapping\Column;
+use CoralORM\Mapping\PrimaryKey;
+use CoralORM\Mapping\CreatedAt;
+use CoralORM\Mapping\UpdatedAt;
+use CoralORM\Mapping\BelongsTo;
+use CoralORM\Mapping\ManyToMany; // For ManyToMany relationship tests
 use DateTimeImmutable;
 
 
@@ -118,9 +118,9 @@ class RepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connectionMock = $this->createMock(Connection::class);
+        $this->connectionMock = $this->createMock(\CoralORM\Connection::class);
         // Pass FQCN of the test entity
-        $this->repository = new Repository($this->connectionMock, TestAttributeRepositoryEntity::class);
+        $this->repository = new \CoralORM\Repository($this->connectionMock, TestAttributeRepositoryEntity::class);
     }
 
     public function testFind()

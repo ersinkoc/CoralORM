@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace YourOrm\Exception;
+namespace CoralORM\Exception;
 
 use PDOException;
 use Throwable; // Import Throwable for previous exception type hint

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\YourOrm\Migration;
+namespace Tests\CoralORM\Migration;
 
-use YourOrm\Connection;
-use YourOrm\Migration\Migrator;
-use YourOrm\Migration\SchemaBuilder;
-use YourOrm\Migration\AbstractMigration;
-use YourOrm\QueryBuilder; // Used by Migrator
+use CoralORM\Connection;
+use CoralORM\Migration\Migrator;
+use CoralORM\Migration\SchemaBuilder;
+use CoralORM\Migration\AbstractMigration;
+use CoralORM\QueryBuilder; // Used by Migrator
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use PDOException; // For testing ensureMigrationsTableExists
@@ -49,10 +49,10 @@ class MigratorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connectionMock = $this->createMock(Connection::class);
-        // $this->qbMock = $this->createMock(QueryBuilder::class); // Not directly used due to Migrator's internal QB instantiation
+        $this->connectionMock = $this->createMock(\CoralORM\Connection::class);
+        // $this->qbMock = $this->createMock(\CoralORM\QueryBuilder::class); // Not directly used due to Migrator's internal QB instantiation
 
-        $this->migrationsPath = sys_get_temp_dir() . '/yourorm_test_migrations_' . uniqid();
+        $this->migrationsPath = sys_get_temp_dir() . '/coralorm_test_migrations_' . uniqid();
         if (!is_dir($this->migrationsPath)) {
             mkdir($this->migrationsPath, 0777, true);
         }
@@ -83,17 +83,17 @@ class MigratorTest extends TestCase
         }
     }
 
-    private function createDummyMigrationFile(string $name, string $className, string $namespace = 'YourOrm\\Migration\\Database', bool $withPostUp = false): void
+    private function createDummyMigrationFile(string $name, string $className, string $namespace = 'CoralORM\\Migration\\Database', bool $withPostUp = false): void
     {
         $postUpMethod = $withPostUp ?
-            'public static bool $postUpCalled = false; public static ?\YourOrm\Connection $postUpConnection = null; public function postUp(\YourOrm\Connection $c): void { self::$postUpCalled = true; self::$postUpConnection = $c; }' :
+            'public static bool $postUpCalled = false; public static ?\CoralORM\Connection $postUpConnection = null; public function postUp(\CoralORM\Connection $c): void { self::$postUpCalled = true; self::$postUpConnection = $c; }' :
             '';
         $content = <<<PHP
 <?php
 namespace {$namespace};
-use YourOrm\Migration\AbstractMigration;
-use YourOrm\Migration\SchemaBuilder;
-use YourOrm\Connection; // Ensure Connection is available for postUp
+use CoralORM\Migration\AbstractMigration;
+use CoralORM\Migration\SchemaBuilder;
+use CoralORM\Connection; // Ensure Connection is available for postUp
 
 class {$className} extends AbstractMigration {
     public static bool \$upCalled = false;
@@ -223,7 +223,7 @@ PHP;
     }
 
     // Helper to create migration file for classes defined within this test file
-    private function createDummyMigrationFileForPredefinedClass(string $name, string $className, string $namespace = 'YourOrm\\Migration\\Database'): void
+    private function createDummyMigrationFileForPredefinedClass(string $name, string $className, string $namespace = 'CoralORM\\Migration\\Database'): void
     {
         // The class definition is already at the top of this test file.
         // We just need to create a file that Migrator can find to 'require_once'.
@@ -234,7 +234,7 @@ PHP;
 // The actual class definition for {$namespace}\\{$className} is within the Test Case itself.
 // Make sure the namespace matches what Migrator expects.
 namespace {$namespace};
-// class {$className} extends \YourOrm\Migration\AbstractMigration { /* ... already defined ... */ }
+// class {$className} extends \CoralORM\Migration\AbstractMigration { /* ... already defined ... */ }
 PHP;
         file_put_contents($this->migrationsPath . '/' . $name . '.php', $content);
     }
